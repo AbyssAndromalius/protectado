@@ -92,8 +92,8 @@ run_update() {
   .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
   ok "Migration base de données"
 
-  # Régénérer les services systemd (applique les changements du repo)
-  log "   Mise à jour des services systemd..."
+  # Régénérer les services systemd et le profil nono (applique les changements du repo)
+  log "   Mise à jour des services systemd et profil nono..."
   NONO_BIN=$(command -v nono 2>/dev/null || echo "nono")
   sed -e "s|__USER__|$REAL_USER|g" \
       -e "s|__WORKDIR__|$INSTALL_DIR|g" \
@@ -103,8 +103,13 @@ run_update() {
   sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
       "$INSTALL_DIR/protectado-runner.service" \
       > /etc/systemd/system/protectado-runner.service
+  mkdir -p /etc/protectado
+  sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
+      "$INSTALL_DIR/protectado-agent.json" \
+      > /etc/protectado/agent.json
+  chmod 640 /etc/protectado/agent.json
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
-  ok "Services systemd mis à jour"
+  ok "Services systemd et profil nono mis à jour"
 
   # Mise à jour du cron
   chmod +x "$INSTALL_DIR/bootstrap/arp-scan.sh"
@@ -331,6 +336,12 @@ step4_services() {
   sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
       "$INSTALL_DIR/protectado-runner.service" \
       > /etc/systemd/system/protectado-runner.service
+
+  mkdir -p /etc/protectado
+  sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
+      "$INSTALL_DIR/protectado-agent.json" \
+      > /etc/protectado/agent.json
+  chmod 640 /etc/protectado/agent.json
 
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   systemctl enable protectado-runner protectado-agent >> "$LOG_FILE" 2>&1

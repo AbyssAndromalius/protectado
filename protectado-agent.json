@@ -9,8 +9,11 @@
   },
   "filesystem": {
     "allow": [
-      "/var/log/pihole",
-      "/etc/pihole",
+      "__WORKDIR__/config.json",
+      "__WORKDIR__/config.json.tmp",
+      "__WORKDIR__/protectado.db",
+      "__WORKDIR__/protectado.db-wal",
+      "__WORKDIR__/protectado.db-shm",
       "/tmp/fw-queue"
     ]
   },
@@ -25,7 +28,7 @@
     "open_port": [80, 8080]
   },
   "workdir": {
-    "access": "readwrite"
+    "access": "readonly"
   },
   "interactive": false
 }
