@@ -107,7 +107,7 @@ run_update() {
   sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
       "$INSTALL_DIR/protectado-agent.json" \
       > /etc/protectado/agent.json
-  chmod 640 /etc/protectado/agent.json
+  chmod 644 /etc/protectado/agent.json
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   ok "Services systemd et profil nono mis à jour"
 
@@ -341,7 +341,7 @@ step4_services() {
   sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
       "$INSTALL_DIR/protectado-agent.json" \
       > /etc/protectado/agent.json
-  chmod 640 /etc/protectado/agent.json
+  chmod 644 /etc/protectado/agent.json
 
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   systemctl enable protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
