@@ -517,6 +517,7 @@ async def list_devices():
             "via_pihole":      via_pihole,
             "last_seen":       last_seen,
             "assigned_profile": assigned.get(ip),
+            "device_type":     arp.get("device_type", "unknown"),
         }
 
         if via_pihole:
