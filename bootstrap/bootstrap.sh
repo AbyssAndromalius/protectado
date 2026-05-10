@@ -106,6 +106,10 @@ run_update() {
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   ok "Services systemd mis à jour"
 
+  # Mise à jour du cron
+  chmod +x "$INSTALL_DIR/bootstrap/arp-scan.sh"
+  step5_autoupdate
+
   # Redémarrage
   log "   Redémarrage des services..."
   systemctl restart protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
