@@ -332,7 +332,7 @@ class PiHoleAPI:
         return success
 
     def _sync_blacklist(self, group_id: int, mode: str, domains: list):
-        """
+        r"""
         Synchronise la blacklist vers un groupe Pi-hole.
         Utilise des patterns regex (.*\.)?domain\.tld$ pour couvrir les sous-domaines.
         - Nouveaux domaines → ajoutés avec le groupe cible.

@@ -78,13 +78,27 @@ run_update() {
 
   # Dépendances Python
   log "   Mise à jour des dépendances Python..."
-  "$INSTALL_DIR/.venv/bin/pip" install -q --upgrade -r "$INSTALL_DIR/requirements.txt" >> "$LOG_FILE" 2>&1
+  "$INSTALL_DIR/.venv/bin/pip" install -q --upgrade -r "$INSTALL_DIR/requirements.txt" 2>&1 | tee -a "$LOG_FILE"
   ok "Dépendances Python"
 
   # Migration base de données
   cd "$INSTALL_DIR"
-  .venv/bin/python -c "import database; database.init_db()" >> "$LOG_FILE" 2>&1
+  .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
   ok "Migration base de données"
+
+  # Régénérer les services systemd (applique les changements du repo)
+  log "   Mise à jour des services systemd..."
+  NONO_BIN=$(command -v nono 2>/dev/null || echo "nono")
+  sed -e "s|__USER__|$REAL_USER|g" \
+      -e "s|__WORKDIR__|$INSTALL_DIR|g" \
+      -e "s|nono run|$NONO_BIN run|g" \
+      "$INSTALL_DIR/protectado-agent.service" \
+      > /etc/systemd/system/protectado-agent.service
+  sed -e "s|__WORKDIR__|$INSTALL_DIR|g" \
+      "$INSTALL_DIR/protectado-runner.service" \
+      > /etc/systemd/system/protectado-runner.service
+  systemctl daemon-reload >> "$LOG_FILE" 2>&1
+  ok "Services systemd mis à jour"
 
   # Redémarrage
   log "   Redémarrage des services..."

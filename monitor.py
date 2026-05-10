@@ -40,7 +40,7 @@ KEEPALIVE_MAX_HITS   = 4      # ≤ 4 hits/cycle (fenêtre Pi-hole 5 min) → ke
 KEEPALIVE_MIN_CYCLES = 3      # 3 cycles consécutifs bas → silence total
 
 
-_global_monitor: "FamilyMonitor | None" = None
+_global_monitor: "ProtectadoMonitor | None" = None
 
 
 def notify_monitor():
@@ -49,7 +49,7 @@ def notify_monitor():
         _global_monitor.notify()
 
 
-class FamilyMonitor:
+class ProtectadoMonitor:
     def __init__(self, config_path: str = "config.json"):
         with open(config_path) as f:
             self.config = json.load(f)

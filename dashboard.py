@@ -18,14 +18,14 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 import database as db
-from monitor import FamilyMonitor
+from monitor import ProtectadoMonitor
 from scheduler import get_current_slot
 import claude_agent
 
 app = FastAPI(title="Protectado")
 templates = Jinja2Templates(directory="templates")
 
-monitor: FamilyMonitor | None = None
+monitor: ProtectadoMonitor | None = None
 
 # Sessions : token → expiry datetime (TTL 24h)
 _sessions: dict[str, datetime] = {}
@@ -165,10 +165,10 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-def get_monitor() -> FamilyMonitor:
+def get_monitor() -> ProtectadoMonitor:
     global monitor
     if monitor is None:
-        monitor = FamilyMonitor()
+        monitor = ProtectadoMonitor()
         try:
             monitor.pihole.setup_profiles(monitor.config["profiles"])
         except Exception as e:
@@ -859,5 +859,8 @@ async def setup_save(body: SetupSaveBody):
 
 if __name__ == "__main__":
     import uvicorn
-    get_monitor()
+    try:
+        get_monitor()
+    except FileNotFoundError:
+        print("[Démarrage] config.json absent — wizard de configuration requis")
     uvicorn.run("dashboard:app", host="0.0.0.0", port=8080, reload=False)
