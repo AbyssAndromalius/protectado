@@ -7,7 +7,7 @@ Requires=protectado-runner.service
 Type=simple
 User=__USER__
 WorkingDirectory=__WORKDIR__
-ExecStart=nono run --profile /etc/protectado/agent.json -- __WORKDIR__/.venv/bin/python dashboard.py
+ExecStart=nono run --read __WORKDIR__ --profile /etc/protectado/agent.json -- __WORKDIR__/.venv/bin/python dashboard.py
 Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1
