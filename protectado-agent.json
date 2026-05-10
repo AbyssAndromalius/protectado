@@ -22,7 +22,7 @@
       "security.cloudflare-dns.com",
       "family.cloudflare-dns.com"
     ],
-    "open_port": [8080]
+    "open_port": [80, 8080]
   },
   "workdir": {
     "access": "readwrite"
