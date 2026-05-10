@@ -179,6 +179,38 @@ class PiHoleAPI:
         data = self._get("/clients")
         return data.get("clients", [])
 
+    def get_network_devices(self) -> list[dict]:
+        """Appareils réseau vus par Pi-hole FTL — IP, MAC, vendor, hostname."""
+        data = self._get("/network/devices")
+        devices = []
+        for dev in data.get("devices", []):
+            mac    = dev.get("hwaddr", "")
+            vendor = dev.get("macVendor", "")
+            for ip_entry in dev.get("ips", []):
+                ip = ip_entry.get("ip", "")
+                if ip:
+                    devices.append({
+                        "ip":       ip,
+                        "mac":      mac,
+                        "vendor":   vendor,
+                        "hostname": ip_entry.get("name", ""),
+                        "last_seen": ip_entry.get("lastSeen"),
+                    })
+        return devices
+
+    def ensure_client_exists(self, ip: str, mac: str = "", hostname: str = "") -> bool:
+        """Crée le client dans Pi-hole s'il n'existe pas encore (groupe par défaut)."""
+        clients = self.get_clients()
+        if any(c.get("client") == ip for c in clients):
+            return True
+        comment = hostname or mac or ip
+        data = self._post("/clients", {
+            "client":  ip,
+            "comment": f"Protectado — {comment}",
+            "groups":  [],
+        })
+        return "client" in data or "clients" in data
+
     def assign_client_to_group(self, ip: str, group_name: str) -> bool:
         """Assigne un appareil (IP) à un groupe Pi-hole."""
         group_id = self.get_group_id(group_name)

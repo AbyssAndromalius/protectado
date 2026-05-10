@@ -59,7 +59,7 @@ class ProtectadoMonitor:
             self.config["pihole"]["host"],
             self.config["pihole"]["password"]
         )
-        self.scanner = ARPScanner(self.config["network"]["subnet"])
+        self.scanner = ARPScanner(self.pihole)
         self._running = False
         self._wakeup = threading.Event()
         self._unusual_events = []  # buffer avant escalade vers Claude
@@ -72,7 +72,7 @@ class ProtectadoMonitor:
         """Recharge config sans redémarrer le service."""
         with open(CONFIG_PATH) as f:
             self.config = json.load(f)
-        self.scanner = ARPScanner(self.config["network"]["subnet"])
+        self.scanner = ARPScanner(self.pihole)
 
     # ------------------------------------------------------------------ #
     #  File d'actions                                                     #

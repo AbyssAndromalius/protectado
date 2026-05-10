@@ -1,10 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Arnaud Ortais
 # Dual-licensed: AGPL-3.0 (open source) or Commercial License — see LICENSE and LICENSE-COMMERCIAL.
-import json
-import re
-
-_ARP_SCAN_FILE = "/tmp/fw-queue/arp_scan.json"
 
 # (type, [mots-clés vendor lowercase])  — premier match gagne
 _VENDOR_TYPES = [
@@ -41,29 +37,23 @@ def _guess_device_type(vendor: str, mac: str) -> str:
 
 
 class ARPScanner:
-    def __init__(self, subnet: str):
-        self.subnet = subnet
+    def __init__(self, pihole):
+        self.pihole = pihole
 
     def scan(self) -> list[dict]:
-        """
-        Lit les résultats du scan ARP produits par bootstrap/arp-scan.sh (root, hors sandbox).
-        """
-        try:
-            with open(_ARP_SCAN_FILE) as f:
-                data = json.load(f)
-            devices = []
-            for d in data.get("devices", []):
-                mac = d.get("mac", "")
-                vendor = d.get("vendor", "")
-                devices.append({
-                    "ip":          d["ip"],
-                    "mac":         mac,
-                    "vendor":      vendor,
-                    "device_type": _guess_device_type(vendor, mac),
-                })
-            return devices
-        except (FileNotFoundError, json.JSONDecodeError, KeyError):
-            return []
+        """Retourne les appareils réseau via Pi-hole FTL (/api/network/devices)."""
+        devices = []
+        for d in self.pihole.get_network_devices():
+            mac    = d.get("mac", "")
+            vendor = d.get("vendor", "")
+            devices.append({
+                "ip":          d["ip"],
+                "mac":         mac,
+                "vendor":      vendor,
+                "hostname":    d.get("hostname", ""),
+                "device_type": _guess_device_type(vendor, mac),
+            })
+        return devices
 
     def get_active_ips(self) -> set[str]:
         return {d["ip"] for d in self.scan()}

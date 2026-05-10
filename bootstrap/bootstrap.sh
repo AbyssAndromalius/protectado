@@ -117,7 +117,6 @@ run_update() {
   ok "Services systemd et profil nono mis à jour"
 
   # Mise à jour du cron
-  chmod +x "$INSTALL_DIR/bootstrap/arp-scan.sh"
   step5_autoupdate
 
   # Redémarrage
@@ -373,8 +372,6 @@ step5_autoupdate() {
 
   chmod +x "$INSTALL_DIR/bootstrap/auto-update.sh"
 
-  chmod +x "$INSTALL_DIR/bootstrap/arp-scan.sh"
-
   cat > /etc/cron.d/protectado <<EOF
 # Protectado — auto-update chaque nuit à 3h00
 0 3 * * * root $INSTALL_DIR/bootstrap/auto-update.sh >> /var/log/fw-update.log 2>&1
@@ -388,8 +385,6 @@ step5_autoupdate() {
 # Nettoyage timeline DNS (conservation 7 jours) — chaque dimanche à 2h00
 0 2 * * 0 root $INSTALL_DIR/.venv/bin/python -c "import sys; sys.path.insert(0,'$INSTALL_DIR'); import database; database.purge_old_timeline()" >> /var/log/protectado-report.log 2>&1
 
-# Scan ARP toutes les 5 minutes — résultat lu par l'agent via /tmp/fw-queue/
-*/5 * * * * root $INSTALL_DIR/bootstrap/arp-scan.sh
 EOF
   chmod 644 /etc/cron.d/protectado
   ok "Crons configurés"

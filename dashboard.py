@@ -482,8 +482,14 @@ async def list_devices():
         if ip:
             pihole_clients[ip] = c
 
-    # ARP scan : tous les appareils actifs sur le réseau
+    # Appareils réseau via Pi-hole FTL
     arp_devices: dict[str, dict] = {d["ip"]: d for d in m.scanner.scan()}
+
+    # Enregistrer automatiquement les nouveaux appareils dans Pi-hole client management
+    known_client_ips = {c.get("client") for c in m.pihole.get_clients()}
+    for ip, dev in arp_devices.items():
+        if ip not in known_client_ips:
+            m.pihole.ensure_client_exists(ip, dev.get("mac", ""), dev.get("hostname", ""))
 
     # Union des deux sources
     all_ips = set(pihole_clients.keys()) | set(arp_devices.keys())
@@ -505,7 +511,7 @@ async def list_devices():
         via_pihole = ip in pihole_clients
 
         hostname = (ph.get("name") or ph.get("hostname") or
-                    arp.get("vendor") or "")
+                    arp.get("hostname") or arp.get("vendor") or "")
         last_seen = _format_last_seen(
             ph.get("last_query") or ph.get("last_seen") or ph.get("lastQuery")
         )
