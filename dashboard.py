@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 import database as db
 from monitor import ProtectadoMonitor
 from paths import CONFIG_PATH, DATA_DIR, DB_PATH as _DB_PATH
-from scheduler import get_current_slot
+from scheduler import get_slot_at
 import claude_agent
 
 app = FastAPI(title="Protectado")
@@ -276,7 +276,7 @@ async def status():
             "youtube_minutes_today": yt_minutes,
             "youtube_limit_minutes": yt_limit,
             "youtube_quota_exceeded": yt_limit and yt_minutes >= yt_limit,
-            "is_bedtime": get_current_slot(pname)["mode"] == "blocked",
+            "is_bedtime": get_slot_at(pname, datetime.now())["mode"] == "blocked",
             "takeover": takeover,
         }
 
@@ -322,7 +322,7 @@ async def schedule():
             continue
         result[pname] = {
             "name": profile["name"],
-            "current_slot": get_current_slot(pname),
+            "current_slot": get_slot_at(pname, datetime.now()),
             "rules": profile.get("schedule", {})
         }
     return JSONResponse(result)
@@ -575,8 +575,8 @@ async def assign_device(body: DeviceAssign):
     # Appliquer immédiatement dans Pi-hole
     if body.profile_key and body.profile_key in config.get("profiles", {}):
         try:
-            from scheduler import get_current_slot
-            slot = get_current_slot(body.profile_key)
+            from scheduler import get_slot_at
+            slot = get_slot_at(body.profile_key, datetime.now())
             m.pihole.assign_client_to_group(body.ip, f"{body.profile_key}-{slot['mode']}")
         except Exception as e:
             print(f"[Dashboard] Avertissement assign Pi-hole : {e}")
@@ -703,7 +703,7 @@ async def device_release(ip: str, request: Request):
         return JSONResponse({"ok": False, "error": "Appareil non trouvé"}, status_code=404)
     db.clear_device_override(ip)
     m = get_monitor()
-    slot = get_current_slot(profile_key)
+    slot = get_slot_at(profile_key, datetime.now())
     ok = m.pihole.assign_client_to_group(ip, f"{profile_key}-{slot['mode']}")
     db.log_event(profile_key, "info", ip, "Mode adulte annulé — retour profil enfant")
     return JSONResponse({"ok": ok})

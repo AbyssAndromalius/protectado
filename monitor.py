@@ -24,7 +24,7 @@ from datetime import datetime
 
 from paths import CONFIG_PATH
 from pihole_api import PiHoleAPI
-from scheduler import get_current_slot
+from scheduler import get_slot_at
 import domain_classifier as classifier
 from arp_scanner import ARPScanner
 import database as db
@@ -109,7 +109,7 @@ class ProtectadoMonitor:
             mode = "permissive" if raw_mode == "free" else raw_mode
             slot = {"slot_start": "00:00", "slot_end": "23:59", "mode": mode}
         else:
-            slot = get_current_slot(profile_key)
+            slot = get_slot_at(profile_key, datetime.now())
             mode = slot["mode"]
 
         # Détecter un changement de slot
@@ -149,7 +149,7 @@ class ProtectadoMonitor:
                           active_ips: set, queries_by_ip: dict):
         """Détecte un appareil actif sans requêtes DNS."""
         # En mode blocked, Pi-hole bloque tout le DNS → zéro requête est normal
-        current_mode = get_current_slot(profile_key)["mode"]
+        current_mode = get_slot_at(profile_key, datetime.now())["mode"]
         if current_mode == "blocked":
             return
 
@@ -172,7 +172,7 @@ class ProtectadoMonitor:
           Après 10 min de silence, la prochaine tentative génère un nouvel événement.
         """
         import domain_classifier as dc
-        current_mode = get_current_slot(profile_key)["mode"]
+        current_mode = get_slot_at(profile_key, datetime.now())["mode"]
         active_blacklist = set(dc.get_active_blacklist(current_mode))
         now = datetime.now()
 
@@ -293,7 +293,7 @@ class ProtectadoMonitor:
                     break
             db.clear_device_override(ip)
             if profile_key:
-                slot = get_current_slot(profile_key)
+                slot = get_slot_at(profile_key, datetime.now())
                 self.pihole.assign_client_to_group(ip, f"{profile_key}-{slot['mode']}")
                 db.log_event(profile_key, "info", ip,
                              "Mode adulte terminé — retour profil enfant")
@@ -310,7 +310,7 @@ class ProtectadoMonitor:
             if not profile.get("devices"):
                 continue
             # Incrémenter l'usage DNS + enregistrer domaine avec mode courant
-            current_mode = get_current_slot(pname)["mode"]
+            current_mode = get_slot_at(pname, datetime.now())["mode"]
             for device in profile.get("devices", []):
                 for domain in by_ip.get(device["ip"], []):
                     root = self._root_domain(domain)
