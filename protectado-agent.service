@@ -1,0 +1,16 @@
+[Unit]
+Description=Protectado — Agent IA (nono sandbox)
+After=network.target pihole-FTL.service protectado-runner.service
+Requires=protectado-runner.service
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+ExecStart=nono run --profile __WORKDIR__/protectado-agent.json -- __WORKDIR__/.venv/bin/python dashboard.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

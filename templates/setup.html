@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protectado — Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .wizard {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* ---- Lang selector ---- */
+    .lang-bar {
+      display: flex; justify-content: flex-end; margin-bottom: 20px;
+    }
+    .lang-bar select {
+      background: #0f172a; border: 1px solid #334155; color: #94a3b8;
+      padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; outline: none; cursor: pointer;
+    }
+    .lang-bar select:focus { border-color: #3b82f6; }
+
+    /* ---- Progress ---- */
+    .progress {
+      display: flex;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+    .step-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 2px solid #334155;
+      color: #475569;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .step-dot.done    { background: #1d4ed8; border-color: #3b82f6; color: white; }
+    .step-dot.current { background: #3b82f6; border-color: #3b82f6; color: white; box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+    .step-line {
+      flex: 1; height: 2px;
+      background: #334155;
+      transition: background 0.2s;
+    }
+    .step-line.done { background: #3b82f6; }
+
+    /* ---- Steps ---- */
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #f8fafc; }
+    .step-desc { color: #64748b; font-size: 0.875rem; margin-bottom: 24px; line-height: 1.65; }
+    .step-desc strong { color: #94a3b8; }
+
+    /* ---- Fields ---- */
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block; font-size: 0.75rem; color: #94a3b8;
+      margin-bottom: 6px; font-weight: 500; letter-spacing: .02em;
+    }
+    .field input[type="text"],
+    .field input[type="password"],
+    .field input[type="number"],
+    .field select {
+      width: 100%;
+      background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 10px 14px;
+      border-radius: 8px; font-size: 0.875rem; outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus { border-color: #3b82f6; }
+    .field.error input, .field.error select { border-color: #ef4444; }
+    .hint { font-size: 0.75rem; color: #475569; margin-top: 5px; }
+    .err-msg { font-size: 0.75rem; color: #f87171; margin-top: 5px; display: none; }
+    .field.error .err-msg { display: block; }
+
+    /* ---- Pi-hole test ---- */
+    .input-btn-row { display: flex; gap: 8px; align-items: stretch; }
+    .input-btn-row input {
+      flex: 1;
+      background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 10px 14px;
+      border-radius: 8px; font-size: 0.875rem; outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-btn-row input:focus { border-color: #3b82f6; }
+    .field.error .input-btn-row input { border-color: #ef4444; }
+    .test-btn {
+      background: #0f172a; border: 1px solid #334155; color: #94a3b8;
+      padding: 10px 14px; border-radius: 8px; font-size: 0.8rem;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .test-btn:hover { border-color: #64748b; color: #e2e8f0; }
+    .test-status { font-size: 0.8rem; margin-top: 8px; min-height: 18px; }
+    .test-ok   { color: #4ade80; }
+    .test-err  { color: #f87171; }
+    .test-wait { color: #64748b; font-style: italic; }
+
+    /* ---- Profiles ---- */
+    .profile-header { display: flex; gap: 8px; margin-bottom: 6px; }
+    .profile-header span { font-size: 0.72rem; color: #475569; font-weight: 500; }
+    .profile-header .ph-name { flex: 1; }
+    .profile-header .ph-age  { width: 56px; }
+    .profile-header .ph-time { width: 80px; text-align: center; }
+    .profile-header .ph-del  { width: 28px; }
+
+    .profile-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .profile-row .pr-name {
+      flex: 1;
+      background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 9px 12px;
+      border-radius: 8px; font-size: 0.875rem; outline: none;
+    }
+    .profile-row .pr-name:focus { border-color: #3b82f6; }
+    .profile-row .pr-age {
+      width: 56px;
+      background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 9px 6px;
+      border-radius: 8px; font-size: 0.875rem; outline: none; text-align: center;
+    }
+    .profile-row .pr-age:focus { border-color: #3b82f6; }
+    .profile-row .pr-time {
+      width: 80px;
+      background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 9px 6px;
+      border-radius: 8px; font-size: 0.8rem; outline: none; text-align: center;
+    }
+    .profile-row .pr-time:focus { border-color: #3b82f6; }
+    .btn-remove {
+      background: transparent; border: none; color: #475569;
+      font-size: 1.1rem; cursor: pointer; padding: 4px 6px; line-height: 1;
+      border-radius: 4px; flex-shrink: 0;
+    }
+    .btn-remove:hover { color: #f87171; background: #450a0a22; }
+    .btn-placeholder { width: 28px; flex-shrink: 0; }
+
+    .add-profile-btn {
+      width: 100%; background: transparent;
+      border: 1px dashed #334155; color: #64748b;
+      padding: 10px; border-radius: 8px; font-size: 0.8rem;
+      cursor: pointer; margin-top: 4px; transition: all 0.15s;
+    }
+    .add-profile-btn:hover { border-color: #64748b; color: #94a3b8; }
+    .profile-err { color: #f87171; font-size: 0.8rem; margin-top: 8px; display: none; }
+
+    /* ---- Welcome / Success ---- */
+    .welcome-icon { font-size: 2.8rem; display: block; margin-bottom: 16px; }
+    .checklist { list-style: none; margin-top: 12px; }
+    .checklist li { padding: 4px 0; font-size: 0.875rem; color: #94a3b8; }
+    .checklist li::before { content: "•"; color: #3b82f6; margin-right: 8px; }
+
+    .success-wrap { text-align: center; padding: 8px 0; }
+    .success-icon { font-size: 3rem; display: block; margin-bottom: 16px; }
+    .success-wrap h2 { margin-bottom: 10px; }
+    .success-wrap p { color: #64748b; font-size: 0.875rem; margin-bottom: 28px; line-height: 1.6; }
+    .btn-goto {
+      display: block; width: 100%;
+      background: #3b82f6; color: white; border: none;
+      padding: 13px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; transition: background 0.15s;
+    }
+    .btn-goto:hover { background: #2563eb; }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-top: 32px;
+    }
+    .btn-prev {
+      background: transparent; border: 1px solid #334155; color: #94a3b8;
+      padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.875rem;
+      transition: all 0.15s;
+    }
+    .btn-prev:hover:not(:disabled) { border-color: #64748b; color: #e2e8f0; }
+    .btn-prev:disabled { opacity: 0.3; cursor: default; }
+    .btn-next {
+      background: #3b82f6; color: white; border: none;
+      padding: 10px 24px; border-radius: 8px; cursor: pointer;
+      font-size: 0.875rem; font-weight: 600; transition: background 0.15s;
+    }
+    .btn-next:hover:not(:disabled) { background: #2563eb; }
+    .btn-next:disabled { background: #334155; color: #475569; cursor: default; }
+
+    @media (max-width: 560px) {
+      .wizard { padding: 28px 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wizard">
+
+  <!-- Language selector (always visible) -->
+  <div class="lang-bar">
+    <select id="lang-select" onchange="changeLang(this.value)">
+      <option value="fr">🇫🇷 Français</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="pt">🇵🇹 Português</option>
+    </select>
+  </div>
+
+  <!-- Progress indicator -->
+  <div class="progress" id="progress-bar">
+    <div class="step-dot current" data-step="1">1</div>
+    <div class="step-line" data-line="1"></div>
+    <div class="step-dot" data-step="2">2</div>
+    <div class="step-line" data-line="2"></div>
+    <div class="step-dot" data-step="3">3</div>
+    <div class="step-line" data-line="3"></div>
+    <div class="step-dot" data-step="4">4</div>
+    <div class="step-line" data-line="4"></div>
+    <div class="step-dot" data-step="5">5</div>
+    <div class="step-line" data-line="5"></div>
+    <div class="step-dot" data-step="6">6</div>
+  </div>
+
+  <!-- ── Step 1 : Welcome ── -->
+  <div class="step-panel active" id="step-1">
+    <span class="welcome-icon">🛡️</span>
+    <h2 id="s1-title"></h2>
+    <p class="step-desc" id="s1-desc"></p>
+    <ul class="checklist">
+      <li id="s1-item1"></li>
+      <li id="s1-item2"></li>
+      <li id="s1-item3"></li>
+      <li id="s1-item4"></li>
+      <li id="s1-item5"></li>
+    </ul>
+  </div>
+
+  <!-- ── Step 2 : Network ── -->
+  <div class="step-panel" id="step-2">
+    <h2 id="s2-title"></h2>
+    <p class="step-desc" id="s2-desc"></p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:10px 14px;background:#0f172a;border:1px solid #334155;border-radius:8px">
+      <span id="conn-icon" style="font-size:1.2rem">🔌</span>
+      <div>
+        <div style="font-size:0.8rem;font-weight:600;color:#e2e8f0" id="conn-type"></div>
+        <div style="font-size:0.75rem;color:#475569" id="conn-iface"></div>
+      </div>
+    </div>
+    <div class="field" id="f-gateway">
+      <label id="lbl-gateway"></label>
+      <input type="text" id="gateway" placeholder="192.168.1.1" autocomplete="off">
+      <div class="err-msg" id="err-gateway"></div>
+    </div>
+    <div class="field" id="f-subnet">
+      <label id="lbl-subnet"></label>
+      <input type="text" id="subnet" placeholder="192.168.1.0/24" autocomplete="off">
+      <div class="err-msg" id="err-subnet"></div>
+    </div>
+  </div>
+
+  <!-- ── Step 3 : Pi-hole ── -->
+  <div class="step-panel" id="step-3">
+    <h2 id="s3-title"></h2>
+    <p class="step-desc" id="s3-desc"></p>
+    <div class="field" id="f-pihole-host">
+      <label id="lbl-pihole-host"></label>
+      <input type="text" id="pihole-host" value="http://localhost" autocomplete="off">
+      <div class="hint" id="hint-pihole-host"></div>
+      <div class="err-msg" id="err-pihole-host"></div>
+    </div>
+    <div class="field" id="f-pihole-pw">
+      <label id="lbl-pihole-pw"></label>
+      <div class="input-btn-row">
+        <input type="password" id="pihole-password" placeholder="••••••••" autocomplete="off">
+        <button class="test-btn" id="btn-test-pihole" onclick="testPihole()"></button>
+      </div>
+      <div class="err-msg" id="err-pihole-pw"></div>
+    </div>
+    <div class="test-status" id="pihole-status"></div>
+  </div>
+
+  <!-- ── Step 4 : AI ── -->
+  <div class="step-panel" id="step-4">
+    <h2 id="s4-title"></h2>
+    <p class="step-desc" id="s4-desc"></p>
+    <div class="field" id="f-or-key">
+      <label id="lbl-or-key"></label>
+      <input type="text" id="or-key" placeholder="sk-or-..." autocomplete="off">
+      <div class="err-msg" id="err-or-key"></div>
+    </div>
+    <div class="field">
+      <label id="lbl-or-model"></label>
+      <select id="or-model">
+        <option value="anthropic/claude-sonnet-4-5">Claude Sonnet 4.5 (recommended)</option>
+        <option value="anthropic/claude-haiku-3-5">Claude Haiku 3.5 (fast, cheaper)</option>
+        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ── Step 5 : Password ── -->
+  <div class="step-panel" id="step-5">
+    <h2 id="s5-title"></h2>
+    <p class="step-desc" id="s5-desc"></p>
+    <div class="field" id="f-pw">
+      <label id="lbl-pw"></label>
+      <input type="password" id="dash-pw" placeholder="••••••••" autocomplete="new-password">
+      <div class="err-msg" id="pw-err"></div>
+    </div>
+    <div class="field" id="f-pw2">
+      <label id="lbl-pw2"></label>
+      <input type="password" id="dash-pw2" placeholder="••••••••" autocomplete="new-password">
+      <div class="err-msg" id="pw2-err"></div>
+    </div>
+  </div>
+
+  <!-- ── Step 6 : Profiles ── -->
+  <div class="step-panel" id="step-6">
+    <h2 id="s6-title"></h2>
+    <p class="step-desc" id="s6-desc"></p>
+    <div class="profile-header">
+      <span class="ph-name" id="ph-name"></span>
+      <span class="ph-age" id="ph-age"></span>
+      <span class="ph-time" id="ph-wake"></span>
+      <span class="ph-time" id="ph-bed"></span>
+      <span class="ph-del"></span>
+    </div>
+    <div id="profiles-list"></div>
+    <button class="add-profile-btn" id="btn-add-profile" onclick="addProfile()"></button>
+    <div class="profile-err" id="profile-err"></div>
+  </div>
+
+  <!-- ── Success ── -->
+  <div class="step-panel" id="step-success">
+    <div class="success-wrap">
+      <span class="success-icon">✅</span>
+      <h2 id="success-title"></h2>
+      <p id="success-desc"></p>
+      <a class="btn-goto" href="/login" id="success-btn"></a>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav" id="nav-bar">
+    <button class="btn-prev" id="btn-prev" onclick="prev()" disabled></button>
+    <button class="btn-next" id="btn-next" onclick="next()"></button>
+  </div>
+
+</div>
+
+<script>
+  // ============================================================ //
+  //  State                                                       //
+  // ============================================================ //
+  let currentStep = 1;
+  const TOTAL = 6;
+  let piholeOk = false;
+  let profiles = [{ name: '', age: '', wake: '07:00', bed: '22:00' }];
+  let T = {};
+  let currentLang = 'fr';
+
+  // ============================================================ //
+  //  i18n                                                        //
+  // ============================================================ //
+  function detectLang() {
+    const supported = ['fr', 'en', 'es', 'pt'];
+    const nav = (navigator.language || 'fr').substring(0, 2).toLowerCase();
+    return supported.includes(nav) ? nav : 'fr';
+  }
+
+  async function loadTranslations(lang) {
+    try {
+      T = await fetch(`/api/i18n/${lang}`).then(r => r.json());
+    } catch (_) {
+      T = {};
+    }
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    applyTranslations();
+  }
+
+  function t(key) { return T[key] || key; }
+
+  function applyTranslations() {
+    // Step 1
+    setText('s1-title',  t('setup.welcome.title'));
+    setText('s1-desc',   t('setup.welcome.desc'));
+    setText('s1-item1',  t('setup.welcome.item1'));
+    setText('s1-item2',  t('setup.welcome.item2'));
+    setText('s1-item3',  t('setup.welcome.item3'));
+    setText('s1-item4',  t('setup.welcome.item4'));
+    setText('s1-item5',  t('setup.welcome.item5'));
+
+    // Step 2
+    setText('s2-title',   t('setup.network.title'));
+    setText('s2-desc',    t('setup.network.desc'));
+    setText('lbl-gateway', t('setup.network.gateway'));
+    setText('lbl-subnet',  t('setup.network.subnet'));
+    setText('err-gateway', t('setup.network.gateway_required'));
+    setText('err-subnet',  t('setup.network.subnet_required'));
+
+    // Step 3
+    setText('s3-title',        t('setup.pihole.title'));
+    setText('s3-desc',         t('setup.pihole.desc'));
+    setText('lbl-pihole-host', t('setup.pihole.host_label'));
+    setText('hint-pihole-host',t('setup.pihole.host_hint'));
+    setText('err-pihole-host', t('setup.pihole.host_required'));
+    setText('lbl-pihole-pw',   t('setup.pihole.password_label'));
+    setText('btn-test-pihole', t('setup.pihole.test_btn'));
+    setText('err-pihole-pw',   t('setup.pihole.password_required'));
+
+    // Step 4
+    setText('s4-title',    t('setup.ai.title'));
+    setText('s4-desc',     t('setup.ai.desc'));
+    setText('lbl-or-key',  t('setup.ai.key_label'));
+    setText('err-or-key',  t('setup.ai.key_required'));
+    setText('lbl-or-model',t('setup.ai.model_label'));
+
+    // Step 5
+    setText('s5-title', t('setup.password.title'));
+    setText('s5-desc',  t('setup.password.desc'));
+    setText('lbl-pw',   t('setup.password.label'));
+    setText('lbl-pw2',  t('setup.password.confirm'));
+
+    // Step 6
+    setText('s6-title',        t('setup.profiles.title'));
+    setText('s6-desc',         t('setup.profiles.desc'));
+    setText('ph-name',         t('setup.profiles.name_col'));
+    setText('ph-age',          t('setup.profiles.age_col'));
+    setText('ph-wake',         t('setup.profiles.wake_col'));
+    setText('ph-bed',          t('setup.profiles.bed_col'));
+    setText('btn-add-profile', t('setup.profiles.add_btn'));
+    setText('profile-err',     t('setup.profiles.required'));
+
+    // Success
+    setText('success-title', t('setup.success.title'));
+    setText('success-desc',  t('setup.success.desc'));
+    setText('success-btn',   t('setup.success.btn'));
+
+    // Nav buttons
+    updateNavButtons();
+
+    // Re-render profiles (placeholder text changes)
+    renderProfiles();
+  }
+
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function changeLang(lang) {
+    loadTranslations(lang);
+  }
+
+  // ============================================================ //
+  //  Init                                                        //
+  // ============================================================ //
+  window.addEventListener('DOMContentLoaded', () => {
+    const lang = detectLang();
+    document.getElementById('lang-select').value = lang;
+    loadTranslations(lang).then(() => {
+      renderProfiles();
+      fetchNetwork();
+    });
+
+    document.getElementById('pihole-host').addEventListener('input',     () => { piholeOk = false; clearPiholeStatus(); });
+    document.getElementById('pihole-password').addEventListener('input', () => { piholeOk = false; clearPiholeStatus(); });
+  });
+
+  async function fetchNetwork() {
+    try {
+      const d = await fetch('/api/setup/network').then(r => r.json());
+      document.getElementById('gateway').value = d.gateway;
+      document.getElementById('subnet').value  = d.subnet;
+
+      const isEth = d.conn_type === 'Ethernet';
+      document.getElementById('conn-icon').textContent  = isEth ? '🔌' : '📶';
+      document.getElementById('conn-type').textContent  = isEth ? t('setup.network.ethernet') : t('setup.network.wifi');
+      document.getElementById('conn-iface').textContent = d.iface ? `${t('setup.network.iface')} : ${d.iface}` : '';
+      document.getElementById('conn-type').style.color  = isEth ? '#4ade80' : '#94a3b8';
+    } catch (_) {
+      const el = document.getElementById('conn-type');
+      if (el) el.textContent = t('setup.network.detect_failed');
+    }
+  }
+
+  // ============================================================ //
+  //  Navigation                                                  //
+  // ============================================================ //
+  function showStep(n) {
+    for (let i = 1; i <= TOTAL; i++) {
+      document.getElementById(`step-${i}`).classList.toggle('active', i === n);
+    }
+    document.getElementById('step-success').classList.remove('active');
+
+    document.querySelectorAll('.step-dot').forEach(el => {
+      const s = +el.dataset.step;
+      el.className = 'step-dot' + (s < n ? ' done' : s === n ? ' current' : '');
+    });
+    document.querySelectorAll('.step-line').forEach(el => {
+      el.className = 'step-line' + (+el.dataset.line < n ? ' done' : '');
+    });
+
+    document.getElementById('btn-prev').disabled = (n === 1);
+    currentStep = n;
+    updateNavButtons();
+  }
+
+  function updateNavButtons() {
+    const prevBtn = document.getElementById('btn-prev');
+    const nextBtn = document.getElementById('btn-next');
+    if (!prevBtn || !nextBtn) return;
+    prevBtn.textContent = t('setup.nav.prev');
+    if (currentStep === 1) {
+      nextBtn.textContent = t('setup.nav.start');
+    } else if (currentStep === TOTAL) {
+      nextBtn.textContent = t('setup.nav.finish');
+    } else {
+      nextBtn.textContent = t('setup.nav.next');
+    }
+    nextBtn.disabled = false;
+  }
+
+  function showSuccess() {
+    for (let i = 1; i <= TOTAL; i++) document.getElementById(`step-${i}`).classList.remove('active');
+    document.querySelectorAll('.step-dot').forEach(el => el.className = 'step-dot done');
+    document.querySelectorAll('.step-line').forEach(el => el.className = 'step-line done');
+    document.getElementById('step-success').classList.add('active');
+    document.getElementById('nav-bar').style.display = 'none';
+    document.getElementById('progress-bar').style.display = 'none';
+  }
+
+  async function next() {
+    if (!validate(currentStep)) return;
+    if (currentStep === TOTAL) { await save(); return; }
+    showStep(currentStep + 1);
+  }
+
+  function prev() {
+    if (currentStep > 1) showStep(currentStep - 1);
+  }
+
+  // ============================================================ //
+  //  Validation                                                  //
+  // ============================================================ //
+  function fieldError(id, hasError) {
+    document.getElementById(id)?.classList.toggle('error', hasError);
+  }
+
+  function validate(step) {
+    let ok = true;
+
+    if (step === 2) {
+      const gw = v('gateway'), sn = v('subnet');
+      fieldError('f-gateway', !gw); if (!gw) ok = false;
+      fieldError('f-subnet',  !sn); if (!sn) ok = false;
+    }
+
+    if (step === 3) {
+      const host = v('pihole-host'), pw = document.getElementById('pihole-password').value;
+      fieldError('f-pihole-host', !host); if (!host) ok = false;
+      fieldError('f-pihole-pw',   !pw);   if (!pw)   ok = false;
+      if (ok && !piholeOk) {
+        setStatus('test-err', t('setup.pihole.test_err_conn'));
+        ok = false;
+      }
+    }
+
+    if (step === 4) {
+      const key = v('or-key');
+      fieldError('f-or-key', !key); if (!key) ok = false;
+    }
+
+    if (step === 5) {
+      const pw  = document.getElementById('dash-pw').value;
+      const pw2 = document.getElementById('dash-pw2').value;
+      const mismatch = pw && pw2 && pw !== pw2;
+      fieldError('f-pw',  !pw);      if (!pw)      ok = false;
+      fieldError('f-pw2', mismatch); if (mismatch) ok = false;
+      document.getElementById('pw-err').textContent  = !pw      ? t('setup.password.required') : '';
+      document.getElementById('pw2-err').textContent = mismatch ? t('setup.password.mismatch') : '';
+    }
+
+    if (step === 6) {
+      const hasProfile = profiles.some(p => p.name.trim());
+      document.getElementById('profile-err').style.display = hasProfile ? 'none' : '';
+      if (!hasProfile) ok = false;
+    }
+
+    return ok;
+  }
+
+  function v(id) { return document.getElementById(id).value.trim(); }
+
+  // ============================================================ //
+  //  Pi-hole test                                                //
+  // ============================================================ //
+  function clearPiholeStatus() {
+    document.getElementById('pihole-status').textContent = '';
+    document.getElementById('pihole-status').className = 'test-status';
+  }
+
+  function setStatus(cls, msg) {
+    const el = document.getElementById('pihole-status');
+    el.className = 'test-status ' + cls;
+    el.textContent = msg;
+  }
+
+  async function testPihole() {
+    const host = v('pihole-host');
+    const pw   = document.getElementById('pihole-password').value;
+    if (!host || !pw) {
+      setStatus('test-err', t('setup.pihole.test_err_fields'));
+      return;
+    }
+    setStatus('test-wait', t('setup.pihole.test_waiting'));
+    piholeOk = false;
+    try {
+      const res = await fetch('/api/setup/test-pihole', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, password: pw })
+      }).then(r => r.json());
+
+      if (res.ok) {
+        setStatus('test-ok', t('setup.pihole.test_ok'));
+        piholeOk = true;
+        fieldError('f-pihole-host', false);
+        fieldError('f-pihole-pw',   false);
+      } else {
+        setStatus('test-err', '✗ ' + (res.error || 'error'));
+      }
+    } catch (_) {
+      setStatus('test-err', t('setup.pihole.test_network_err'));
+    }
+  }
+
+  // ============================================================ //
+  //  Profiles                                                    //
+  // ============================================================ //
+  function renderProfiles() {
+    const namePh = t('setup.profiles.name_placeholder');
+    document.getElementById('profiles-list').innerHTML = profiles.map((p, i) => `
+      <div class="profile-row">
+        <input class="pr-name" type="text" placeholder="${esc(namePh)}" value="${esc(p.name)}"
+          oninput="profiles[${i}].name = this.value">
+        <input class="pr-age" type="number" placeholder="—" min="1" max="99" value="${esc(p.age)}"
+          oninput="profiles[${i}].age = this.value">
+        <input class="pr-time" type="time" value="${esc(p.wake)}"
+          oninput="profiles[${i}].wake = this.value">
+        <input class="pr-time" type="time" value="${esc(p.bed)}"
+          oninput="profiles[${i}].bed = this.value">
+        ${profiles.length > 1
+          ? `<button class="btn-remove" onclick="removeProfile(${i})" title="×">×</button>`
+          : '<span class="btn-placeholder"></span>'}
+      </div>`
+    ).join('');
+  }
+
+  function addProfile() {
+    profiles.push({ name: '', age: '', wake: '07:00', bed: '22:00' });
+    renderProfiles();
+  }
+
+  function removeProfile(i) {
+    profiles.splice(i, 1);
+    renderProfiles();
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ============================================================ //
+  //  Save                                                        //
+  // ============================================================ //
+  async function save() {
+    const btn = document.getElementById('btn-next');
+    btn.disabled = true;
+    btn.textContent = t('setup.nav.saving');
+    try {
+      const res = await fetch('/api/setup/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language:           currentLang,
+          gateway:            v('gateway'),
+          subnet:             v('subnet'),
+          pihole_host:        v('pihole-host'),
+          pihole_password:    document.getElementById('pihole-password').value,
+          openrouter_key:     v('or-key'),
+          openrouter_model:   document.getElementById('or-model').value,
+          dashboard_password: document.getElementById('dash-pw').value,
+          profiles:           profiles.filter(p => p.name.trim())
+        })
+      }).then(r => r.json());
+
+      if (res.ok) {
+        showSuccess();
+      } else {
+        btn.disabled = false;
+        updateNavButtons();
+        alert(t('setup.save_error') + (res.error ? ' — ' + res.error : ''));
+      }
+    } catch (_) {
+      btn.disabled = false;
+      updateNavButtons();
+      alert(t('setup.save_error'));
+    }
+  }
+</script>
+</body>
+</html>
