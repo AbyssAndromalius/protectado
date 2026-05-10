@@ -62,15 +62,21 @@ run_update() {
 
   # Mise à jour du code
   log "   Récupération des mises à jour..."
-  git fetch origin "$BRANCH" --quiet >> "$LOG_FILE" 2>&1
-  REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")
-
-  if [ -n "$REMOTE" ] && [ "$LOCAL" = "$REMOTE" ]; then
-    ok "Déjà à jour (${LOCAL:0:8})"
+  if git fetch origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"; then
+    REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")
+    if [ -n "$REMOTE" ] && [ "$LOCAL" = "$REMOTE" ]; then
+      ok "Déjà à jour (${LOCAL:0:8})"
+    else
+      if git checkout "$BRANCH" 2>&1 | tee -a "$LOG_FILE"; then
+        git pull origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE" \
+          || log "   ⚠ pull échoué — code local conservé"
+        ok "Code mis à jour : ${LOCAL:0:8} → ${REMOTE:0:8}"
+      else
+        log "   ⚠ Branche '$BRANCH' introuvable — branche actuelle conservée"
+      fi
+    fi
   else
-    git checkout "$BRANCH" >> "$LOG_FILE" 2>&1 || true
-    git pull origin "$BRANCH" --quiet >> "$LOG_FILE" 2>&1
-    ok "Code mis à jour : ${LOCAL:0:8} → ${REMOTE:0:8}"
+    log "   ⚠ fetch échoué (réseau ?) — utilisation du code local"
   fi
 
   # Restaurer config.json (jamais écrasé par git)
