@@ -16,7 +16,7 @@ class ARPScanner:
         """
         try:
             result = subprocess.run(
-                ["sudo", "arp-scan", "--localnet", "--quiet"],
+                ["arp-scan", "--localnet", "--quiet"],
                 capture_output=True, text=True, timeout=30
             )
             devices = []

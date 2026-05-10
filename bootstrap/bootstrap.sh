@@ -187,6 +187,10 @@ step1_system() {
     >> "$LOG_FILE" 2>&1
   ok "Paquets installés"
 
+  # CAP_NET_RAW sur arp-scan — permet le scan réseau sans root
+  setcap cap_net_raw+ep "$(which arp-scan)" >> "$LOG_FILE" 2>&1
+  ok "cap_net_raw → arp-scan"
+
   # Mises à jour de sécurité automatiques (patches OS uniquement)
   dpkg-reconfigure -f noninteractive unattended-upgrades >> "$LOG_FILE" 2>&1
   ok "unattended-upgrades activé"
