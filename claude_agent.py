@@ -17,6 +17,7 @@ import os
 import threading
 from datetime import datetime
 from openai import OpenAI
+from paths import CONFIG_PATH
 
 import database as db
 from monitor import notify_monitor, KEEPALIVE_MAX_HITS
@@ -65,7 +66,7 @@ _LANG_PROMPTS = {
 
 def _build_system_prompt() -> str:
     try:
-        with open("config.json") as f:
+        with open(CONFIG_PATH) as f:
             config = json.load(f)
         lang = config.get("language", "fr")
         p = _LANG_PROMPTS.get(lang, _LANG_PROMPTS["fr"])
@@ -227,7 +228,7 @@ def _get_client(config: dict) -> tuple:
 
 
 def _load_config() -> dict:
-    with open("config.json") as f:
+    with open(CONFIG_PATH) as f:
         return json.load(f)
 
 

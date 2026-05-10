@@ -8,6 +8,7 @@ Le planning est lu depuis config.json (profiles[key]["schedule"]).
 
 import json
 from datetime import datetime, time, timedelta
+from paths import CONFIG_PATH
 
 MODE_LABELS = {
     "blocked":    "🔴 Bloqué",
@@ -20,7 +21,7 @@ _slot_extensions: dict[str, int] = {}
 
 
 def _load_config() -> dict:
-    with open("config.json") as f:
+    with open(CONFIG_PATH) as f:
         return json.load(f)
 
 
