@@ -599,6 +599,17 @@ class ProfileUpdate(BaseModel):
     schedule: dict = {}
 
 
+@app.post("/api/profiles/pihole-setup")
+async def pihole_setup():
+    config = _load_config()
+    m = get_monitor()
+    try:
+        m.pihole.setup_profiles(config.get("profiles", {}))
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 @app.post("/api/profiles/{key}")
 async def create_or_update_profile(key: str, body: ProfileUpdate):
     if not _PROFILE_KEY_RE.match(key) or key == "monitoring":
@@ -623,17 +634,6 @@ async def delete_profile(key: str):
     config.get("profiles", {}).pop(key, None)
     _save_config(config)
     return JSONResponse({"ok": True})
-
-
-@app.post("/api/profiles/pihole-setup")
-async def pihole_setup():
-    config = _load_config()
-    m = get_monitor()
-    try:
-        m.pihole.setup_profiles(config.get("profiles", {}))
-        return JSONResponse({"ok": True})
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 # ------------------------------------------------------------------ #
