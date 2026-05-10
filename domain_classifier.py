@@ -206,9 +206,9 @@ def is_cdn(domain: str) -> bool:
     return any(domain.endswith(cdn) for cdn in CDN_PATTERNS)
 
 
-def record_domain(profile: str, domain: str, mode: str):
+def record_domain(domain: str, mode: str):
     """
-    Enregistre un accès à un domaine en contexte.
+    Enregistre un accès à un domaine dans le catalogue global de classification.
     Appelé par monitor.py à chaque cycle.
     """
     if is_cdn(domain):

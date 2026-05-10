@@ -321,11 +321,11 @@ class PiHoleAPI:
                 print(f"[PiHole] Wildcard DNS ajouté pour {profile_name}-blocked")
 
         # 3. Assigner les appareils à leur groupe initial (mode actif)
-        from scheduler import get_current_slot
+        from scheduler import get_slot_at
         for profile_name, profile in profiles.items():
             if profile.get("mode") == "monitoring":
                 continue
-            slot = get_current_slot(profile_name)
+            slot = get_slot_at(profile_name, datetime.now())
             active_group = f"{profile_name}-{slot['mode']}"
             for device in profile.get("devices", []):
                 self.assign_client_to_group(device["ip"], active_group)

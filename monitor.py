@@ -316,7 +316,7 @@ class ProtectadoMonitor:
                     root = self._root_domain(domain)
                     if root:
                         db.increment_usage(pname, root)
-                        classifier.record_domain(pname, root, current_mode)
+                        classifier.record_domain(root, current_mode)
 
             # Règles déterministes — aucun appel IA
             self._check_schedule(pname, profile, active_ips)
