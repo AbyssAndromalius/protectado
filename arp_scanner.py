@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Arnaud Ortais
 # Dual-licensed: AGPL-3.0 (open source) or Commercial License — see LICENSE and LICENSE-COMMERCIAL.
-import subprocess
+import json
 import re
+
+_ARP_SCAN_FILE = "/tmp/fw-queue/arp_scan.json"
 
 # (type, [mots-clés vendor lowercase])  — premier match gagne
 _VENDOR_TYPES = [
@@ -44,48 +46,23 @@ class ARPScanner:
 
     def scan(self) -> list[dict]:
         """
-        Retourne la liste des appareils actifs sur le réseau local.
-        Nécessite : sudo apt install arp-scan
+        Lit les résultats du scan ARP produits par bootstrap/arp-scan.sh (root, hors sandbox).
         """
         try:
-            result = subprocess.run(
-                ["arp-scan", "--localnet", "--quiet"],
-                capture_output=True, text=True, timeout=30
-            )
+            with open(_ARP_SCAN_FILE) as f:
+                data = json.load(f)
             devices = []
-            for line in result.stdout.splitlines():
-                # Format : 192.168.0.x  aa:bb:cc:dd:ee:ff  Constructeur
-                parts = line.split("\t")
-                if len(parts) >= 2 and re.match(r"\d+\.\d+\.\d+\.\d+", parts[0]):
-                    mac = parts[1].strip() if len(parts) > 1 else ""
-                    vendor = parts[2].strip() if len(parts) > 2 else ""
-                    devices.append({
-                        "ip": parts[0].strip(),
-                        "mac": mac,
-                        "vendor": vendor,
-                        "device_type": _guess_device_type(vendor, mac),
-                    })
+            for d in data.get("devices", []):
+                mac = d.get("mac", "")
+                vendor = d.get("vendor", "")
+                devices.append({
+                    "ip":          d["ip"],
+                    "mac":         mac,
+                    "vendor":      vendor,
+                    "device_type": _guess_device_type(vendor, mac),
+                })
             return devices
-        except Exception as e:
-            print(f"[Scanner] Erreur arp-scan : {e}")
-            return self._fallback_arp()
-
-    def _fallback_arp(self) -> list[dict]:
-        """Fallback via la table ARP du système."""
-        try:
-            result = subprocess.run(["arp", "-n"], capture_output=True, text=True)
-            devices = []
-            for line in result.stdout.splitlines()[1:]:
-                parts = line.split()
-                if len(parts) >= 3 and parts[2] != "<incomplete>":
-                    devices.append({
-                        "ip": parts[0],
-                        "mac": parts[2],
-                        "vendor": ""
-                    })
-            return devices
-        except Exception as e:
-            print(f"[Scanner] Erreur arp fallback : {e}")
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
             return []
 
     def get_active_ips(self) -> set[str]:
