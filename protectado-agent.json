@@ -9,7 +9,6 @@
   },
   "filesystem": {
     "allow": [
-      "__WORKDIR__",
       "/var/log/pihole",
       "/etc/pihole",
       "/tmp/fw-queue"
