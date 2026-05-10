@@ -28,6 +28,28 @@
     }
     .header-left { display: flex; align-items: center; gap: 14px; }
     .header-left h1 { font-size: 1.2rem; font-weight: 700; color: #f8fafc; }
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 24px;
+      border-bottom: 1px solid #1e293b;
+      background: #0f172a;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #64748b;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: -1px;
+      text-decoration: none;
+    }
+    .tab-btn:hover { color: #94a3b8; }
+    .tab-btn.active { color: #e2e8f0; border-bottom-color: #3b82f6; }
+
     .back-link {
       color: #64748b; font-size: 0.82rem; text-decoration: none;
       border: 1px solid #334155; padding: 5px 12px; border-radius: 8px;
@@ -216,12 +238,18 @@
 
   <header class="app-header">
     <div class="header-left">
-      <a class="back-link" href="/">← {{ t['nav.dashboard'] }}</a>
-      <h1>📱 {{ t['devices.title'] }}</h1>
+      <h1>🛡️ {{ t['app.name'] }}</h1>
     </div>
     <form id="logout-form" action="/logout" method="POST" style="display:none"></form>
     <button class="logout-btn" onclick="document.getElementById('logout-form').submit()">{{ t['nav.logout'] }}</button>
   </header>
+
+  <div class="tabs">
+    <a class="tab-btn" href="/" style="text-decoration:none">📊 {{ t['nav.dashboard'] }}</a>
+    <a class="tab-btn" href="/?tab=gestion" style="text-decoration:none">⚙️ {{ t['nav.manage'] }}</a>
+    <a class="tab-btn active" href="/devices" style="text-decoration:none">📱 {{ t['nav.devices'] }}</a>
+    <a class="tab-btn" href="/?tab=profils" style="text-decoration:none">👥 {{ t['nav.profiles'] }}</a>
+  </div>
 
   <div class="content">
 

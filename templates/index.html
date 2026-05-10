@@ -452,6 +452,10 @@
       if (tab === 'profils') loadProfiles();
     }
 
+    // Ouvre l'onglet indiqué dans ?tab= (retour depuis /devices)
+    const _tabParam = new URLSearchParams(location.search).get('tab');
+    if (_tabParam && ['gestion','profils'].includes(_tabParam)) switchTab(_tabParam);
+
     // ================================================================ //
     //  Onglet Dashboard                                                 //
     // ================================================================ //
