@@ -9,11 +9,6 @@
   },
   "filesystem": {
     "allow": [
-      "__WORKDIR__/config.json",
-      "__WORKDIR__/config.json.tmp",
-      "__WORKDIR__/protectado.db",
-      "__WORKDIR__/protectado.db-wal",
-      "__WORKDIR__/protectado.db-shm",
       "/tmp/fw-queue"
     ]
   },
@@ -28,7 +23,7 @@
     "open_port": [80, 8080]
   },
   "workdir": {
-    "access": "read"
+    "access": "readwrite"
   },
   "interactive": false
 }
