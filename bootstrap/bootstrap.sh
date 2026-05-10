@@ -430,10 +430,53 @@ run_purge() {
   echo "║     Protectado — Désinstallation complète       ║"
   echo "╚══════════════════════════════════════════════════╝"
   echo ""
-  read -rp "  ⚠  Supprimer TOUTE l'installation (code + données) ? [oui/N] : " CONFIRM
+  read -rp "  ⚠  Supprimer TOUTE l'installation (code + données + Pi-hole) ? [oui/N] : " CONFIRM
   [ "$CONFIRM" != "oui" ] && echo "Annulé." && exit 0
 
-  systemctl stop  protectado-agent protectado-runner 2>/dev/null || true
+  # ── 1. Nettoyage Pi-hole AVANT de supprimer le venv ──────────────────────
+  if [ -f "$INSTALL_DIR/data/config.json" ] && [ -x "$INSTALL_DIR/.venv/bin/python" ]; then
+    log "Nettoyage Pi-hole..."
+    "$INSTALL_DIR/.venv/bin/python" - <<'PYEOF' || log "  ⚠ Nettoyage Pi-hole partiel (continuer)"
+import sys, json
+sys.path.insert(0, '/opt/protectado')
+from paths import CONFIG_PATH
+from pihole_api import PiHoleAPI
+from urllib.parse import quote as urlquote
+
+with open(CONFIG_PATH) as f:
+    config = json.load(f)
+
+ph = PiHoleAPI(config["pihole"]["host"], config["pihole"]["password"])
+
+# Groupes créés par Protectado
+_SUFFIXES = ("-blocked", "-work", "-permissive")
+for g in ph.get_groups():
+    name = g.get("name", "")
+    if any(name.endswith(s) for s in _SUFFIXES) or name == "adult-override":
+        ph._delete(f"/groups/{g['id']}")
+        print(f"  Groupe supprimé : {name}")
+
+# Clients enregistrés par Protectado
+for c in ph.get_clients():
+    if "Protectado" in c.get("comment", ""):
+        ph._delete(f"/clients/{urlquote(c['client'], safe='')}")
+        print(f"  Client supprimé : {c['client']}")
+
+# Domaines bloquants Protectado
+for d in ph.get_deny_domains():
+    if "protectado" in d.get("comment", "").lower():
+        ph._delete(f"/domains/deny/regex/{urlquote(d['domain'], safe='')}")
+        print(f"  Règle supprimée : {d['domain'][:50]}")
+
+print("Pi-hole nettoyé.")
+PYEOF
+    ok "Pi-hole nettoyé"
+  else
+    log "  ⚠ config.json ou venv absent — nettoyage Pi-hole ignoré"
+  fi
+
+  # ── 2. Arrêt et suppression ───────────────────────────────────────────────
+  systemctl stop    protectado-agent protectado-runner 2>/dev/null || true
   systemctl disable protectado-agent protectado-runner 2>/dev/null || true
   rm -f /etc/systemd/system/protectado-agent.service
   rm -f /etc/systemd/system/protectado-runner.service
@@ -443,9 +486,10 @@ run_purge() {
   rm -rf /etc/protectado
   rm -rf "$INSTALL_DIR"
   rm -f /var/log/protectado-*.log /var/log/fw-*.log
+  rm -f /tmp/fw-queue/arp_scan.json
 
   echo ""
-  echo "  ✓ Installation supprimée."
+  echo "  ✓ Installation et configuration Pi-hole supprimées."
   echo "  Pour réinstaller : curl -fsSL https://code.barbed.fr/abyss/protectado/raw/branch/main/bootstrap/bootstrap.sh | sudo bash"
   echo ""
 }
