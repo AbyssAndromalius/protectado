@@ -28,7 +28,7 @@
     "open_port": [80, 8080]
   },
   "workdir": {
-    "access": "readonly"
+    "access": "read"
   },
   "interactive": false
 }
