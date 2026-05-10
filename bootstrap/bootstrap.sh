@@ -266,8 +266,6 @@ step3_protectado() {
     ok "Dépôt cloné"
   fi
 
-  chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
-
   # nono (sandbox kernel pour l'agent IA)
   if ! command -v nono &>/dev/null; then
     log "   Installation de nono..."
@@ -299,6 +297,10 @@ step3_protectado() {
   cd "$INSTALL_DIR"
   .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
   ok "Base de données initialisée"
+
+  # Ajuster les permissions après création de tous les fichiers
+  chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
+  ok "Permissions ajustées ($REAL_USER)"
 }
 
 # ── Étape 4 : Services systemd ───────────────────────────────────────────────
