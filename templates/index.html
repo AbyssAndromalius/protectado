@@ -544,10 +544,10 @@
     }
 
     async function loadEvents() {
+      const list = document.getElementById("events-list");
       try {
         const events = await fetch("/api/events?limit=30").then(r => r.json());
-        const list = document.getElementById("events-list");
-        if (!events.length) {
+        if (!Array.isArray(events) || !events.length) {
           list.innerHTML = `<p style="color:#475569;font-size:0.8rem">${T['dashboard.events.none']}</p>`;
           return;
         }
@@ -560,7 +560,9 @@
             <span class="event-msg">${detail}${e.message}</span>
           </div>`;
         }).join("");
-      } catch(e) {}
+      } catch(_) {
+        list.innerHTML = `<p style="color:#475569;font-size:0.8rem">${T['dashboard.events.none']}</p>`;
+      }
     }
 
     async function sendChat() {
