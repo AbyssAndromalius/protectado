@@ -246,7 +246,6 @@ def _sync_pihole_blacklists(config: dict):
     from pihole_api import PiHoleAPI
     from domain_classifier import get_active_blacklist
     api = PiHoleAPI(config["pihole"]["host"], config["pihole"]["password"])
-    api._authenticate()
     for mode in ["work", "permissive"]:
         blacklist = get_active_blacklist(mode)
         for profile_name, profile in config.get("profiles", {}).items():
@@ -285,12 +284,11 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
         minutes = args["minutes"]
         try:
             from pihole_api import PiHoleAPI
-            from scheduler import get_current_slot
+            from scheduler import get_slot_at
             pihole = PiHoleAPI(config["pihole"]["host"], config["pihole"]["password"])
-            pihole._authenticate()
 
             # Retirer uniquement du groupe actif du profil (pas globalement)
-            slot = get_current_slot(profile)
+            slot = get_slot_at(profile, datetime.now())
             current_mode = slot["mode"]
             if current_mode in ("work", "permissive"):
                 group_name = f"{profile}-{current_mode}"

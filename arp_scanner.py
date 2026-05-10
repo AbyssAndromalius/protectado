@@ -9,7 +9,7 @@ _VENDOR_TYPES = [
                   "azurewave", "alps alpine", "quanta computer"]),
     ("computer", ["asustek", "asus", "hp inc", "hewlett", "dell", "lenovo",
                   "acer", "msi ", "gigabyte", "intel corp", "raspberry pi",
-                  "microsoft", "apple"]),
+                  "microsoft"]),
     ("gaming",   ["nintendo", "sony interactive", "valve", "xbox"]),
     ("printer",  ["brother", "canon", "epson", "xerox", "lexmark", "kyocera"]),
     ("router",   ["tp-link", "netgear", "ubiquiti", "cisco", "linksys",

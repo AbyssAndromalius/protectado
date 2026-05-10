@@ -72,7 +72,7 @@ def get_db():
     try:
         yield conn
         conn.commit()
-    except:
+    except Exception:
         conn.rollback()
         raise
     finally:

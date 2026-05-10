@@ -97,7 +97,7 @@ def get_slot_at(profile: str, dt: datetime) -> dict:
     import database as db
     date_str = dt.strftime("%Y-%m-%d")
     override = db.get_override_for_date(profile, date_str)
-    if override:
+    if override and override["mode"] != "normal":
         raw_mode = override["mode"]
         mode = "permissive" if raw_mode == "free" else raw_mode
         return {

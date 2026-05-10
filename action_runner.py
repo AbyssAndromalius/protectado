@@ -27,9 +27,7 @@ import glob
 import logging
 from datetime import datetime
 
-# Chemin de config relatif à ce script — résistant aux installations non-standard
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_CONFIG_PATH = os.path.join(_SCRIPT_DIR, "config.json")
+from paths import CONFIG_PATH as _CONFIG_PATH
 
 # Instance Pi-hole persistante — évite de recréer une session à chaque action
 _pihole_api = None
@@ -37,10 +35,10 @@ _pihole_api = None
 def get_pihole_api():
     global _pihole_api
     if _pihole_api is None:
-        config = json.load(open(_CONFIG_PATH))
+        with open(_CONFIG_PATH) as f:
+            config = json.load(f)
         from pihole_api import PiHoleAPI
         _pihole_api = PiHoleAPI(config["pihole"]["host"], config["pihole"]["password"])
-        _pihole_api._authenticate()
     return _pihole_api
 
 ACTION_QUEUE_DIR = "/tmp/fw-queue"
@@ -127,7 +125,8 @@ def apply_pihole_mode(args: dict):
         if not ok:
             # Groupes Pi-hole absents (premier démarrage ou reset) — setup + retry
             log.info("Groupes Pi-hole introuvables — setup initial...")
-            config = json.load(open(_CONFIG_PATH))
+            with open(_CONFIG_PATH) as f:
+                config = json.load(f)
             api.setup_profiles(config["profiles"])
             ok = api.switch_profile_mode(
                 profile_name=profile,
