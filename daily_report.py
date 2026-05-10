@@ -8,9 +8,10 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 import domain_classifier as classifier
 import claude_agent
+from paths import CONFIG_PATH
 
 # 1. Charger la config
-with open("config.json") as f:
+with open(CONFIG_PATH) as f:
     config = json.load(f)
 
 # 2. Catégoriser les domaines inconnus (1 appel Claude)

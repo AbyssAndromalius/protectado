@@ -4,8 +4,7 @@
 import sqlite3
 from datetime import datetime, date, timedelta
 from contextlib import contextmanager
-
-DB_PATH = "protectado.db"
+from paths import DB_PATH
 
 # Fenêtre de session : si deux requêtes sont séparées de moins de N minutes
 # on considère que c'est la même session de visionnage

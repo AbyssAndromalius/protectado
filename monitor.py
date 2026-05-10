@@ -22,6 +22,7 @@ import os
 from collections import deque
 from datetime import datetime
 
+from paths import CONFIG_PATH
 from pihole_api import PiHoleAPI
 from scheduler import get_current_slot
 import domain_classifier as classifier
@@ -50,7 +51,7 @@ def notify_monitor():
 
 
 class ProtectadoMonitor:
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str = CONFIG_PATH):
         with open(config_path) as f:
             self.config = json.load(f)
 
@@ -68,8 +69,8 @@ class ProtectadoMonitor:
         db.init_db()
 
     def reload_config(self):
-        """Recharge config.json sans redémarrer le service."""
-        with open("config.json") as f:
+        """Recharge config sans redémarrer le service."""
+        with open(CONFIG_PATH) as f:
             self.config = json.load(f)
         self.scanner = ARPScanner(self.config["network"]["subnet"])
 

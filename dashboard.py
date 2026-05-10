@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 import database as db
 from monitor import ProtectadoMonitor
+from paths import CONFIG_PATH, DATA_DIR, DB_PATH as _DB_PATH
 from scheduler import get_current_slot
 import claude_agent
 
@@ -68,15 +69,15 @@ def _t(lang: str | None = None) -> dict:
 
 
 def _load_config() -> dict:
-    with open("config.json") as f:
+    with open(CONFIG_PATH) as f:
         return json.load(f)
 
 
 def _save_config(config: dict):
-    tmp = "config.json.tmp"
+    tmp = CONFIG_PATH + ".tmp"
     with open(tmp, "w") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, "config.json")
+    os.replace(tmp, CONFIG_PATH)
     global monitor
     if monitor:
         monitor.reload_config()
@@ -151,11 +152,11 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
 
     if path == "/setup" or path.startswith("/api/setup") or path.startswith("/api/i18n"):
-        if path == "/setup" and os.path.exists("config.json"):
+        if path == "/setup" and os.path.exists(CONFIG_PATH):
             return RedirectResponse(url="/", status_code=302)
         return await call_next(request)
 
-    if not os.path.exists("config.json"):
+    if not os.path.exists(CONFIG_PATH):
         return RedirectResponse(url="/setup", status_code=302)
 
     if path == "/login":
@@ -707,10 +708,10 @@ async def backup(request: Request):
         return RedirectResponse("/login")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        if os.path.exists("config.json"):
-            zf.write("config.json")
-        if os.path.exists("protectado.db"):
-            zf.write("protectado.db")
+        if os.path.exists(CONFIG_PATH):
+            zf.write(CONFIG_PATH, arcname="config.json")
+        if os.path.exists(_DB_PATH):
+            zf.write(_DB_PATH, arcname="protectado.db")
     buf.seek(0)
     filename = f"protectado-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
     return StreamingResponse(
@@ -725,7 +726,6 @@ async def restore(request: Request, file: UploadFile = File(...)):
     if not _check_session(request):
         return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
     data = await file.read()
-    install_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             names = zf.namelist()
@@ -734,7 +734,6 @@ async def restore(request: Request, file: UploadFile = File(...)):
                     {"ok": False, "error": "Archive invalide (config.json manquant)"},
                     status_code=400,
                 )
-            # Valider le JSON avant d'écraser la config en production
             raw_cfg = zf.read("config.json")
             try:
                 json.loads(raw_cfg)
@@ -743,9 +742,10 @@ async def restore(request: Request, file: UploadFile = File(...)):
                     {"ok": False, "error": "config.json invalide (JSON malformé)"},
                     status_code=400,
                 )
-            zf.extract("config.json", install_dir)
+            os.makedirs(DATA_DIR, exist_ok=True)
+            zf.extract("config.json", DATA_DIR)
             if "protectado.db" in names:
-                zf.extract("protectado.db", install_dir)
+                zf.extract("protectado.db", DATA_DIR)
     except zipfile.BadZipFile:
         return JSONResponse({"ok": False, "error": "Fichier ZIP invalide"}, status_code=400)
     global monitor
@@ -811,7 +811,7 @@ class SetupSaveBody(BaseModel):
 
 @app.post("/api/setup/save")
 async def setup_save(body: SetupSaveBody):
-    if os.path.exists("config.json"):
+    if os.path.exists(CONFIG_PATH):
         return JSONResponse({"ok": False, "error": "Configuration déjà existante"}, status_code=409)
 
     profiles: dict = {}
@@ -848,7 +848,8 @@ async def setup_save(body: SetupSaveBody):
         "profiles": profiles,
     }
 
-    with open("config.json", "w") as f:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(CONFIG_PATH, "w") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
     return JSONResponse({"ok": True})
@@ -863,5 +864,5 @@ if __name__ == "__main__":
     try:
         get_monitor()
     except FileNotFoundError:
-        print("[Démarrage] config.json absent — wizard de configuration requis")
+        print("[Démarrage] data/config.json absent — wizard de configuration requis")
     uvicorn.run("dashboard:app", host="0.0.0.0", port=8080, reload=False)

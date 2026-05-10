@@ -55,10 +55,15 @@ run_update() {
   cd "$INSTALL_DIR"
   LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 
+  # Migration one-shot : anciens fichiers à la racine → data/
+  mkdir -p "$INSTALL_DIR/data"
+  [ -f "$INSTALL_DIR/config.json" ]    && mv "$INSTALL_DIR/config.json"    "$INSTALL_DIR/data/config.json"   && ok "Migration config.json → data/"
+  [ -f "$INSTALL_DIR/protectado.db" ] && mv "$INSTALL_DIR/protectado.db" "$INSTALL_DIR/data/protectado.db" && ok "Migration protectado.db → data/"
+
   # Sauvegarde datée dans un répertoire persistant (hors /tmp)
   mkdir -p "$BACKUP_DIR"
-  [ -f "$INSTALL_DIR/config.json" ]    && cp "$INSTALL_DIR/config.json"    "$BACKUP_DIR/config.json"   && ok "config.json    → $BACKUP_DIR"
-  [ -f "$INSTALL_DIR/protectado.db" ] && cp "$INSTALL_DIR/protectado.db" "$BACKUP_DIR/protectado.db" && ok "protectado.db → $BACKUP_DIR"
+  [ -f "$INSTALL_DIR/data/config.json" ]    && cp "$INSTALL_DIR/data/config.json"    "$BACKUP_DIR/config.json"   && ok "config.json    → $BACKUP_DIR"
+  [ -f "$INSTALL_DIR/data/protectado.db" ] && cp "$INSTALL_DIR/data/protectado.db" "$BACKUP_DIR/protectado.db" && ok "protectado.db → $BACKUP_DIR"
 
   # Mise à jour du code
   log "   Récupération des mises à jour..."
@@ -125,8 +130,9 @@ run_update() {
     log "⚠  L'agent n'a pas redémarré — rollback vers ${LOCAL:0:8}..."
     cd "$INSTALL_DIR"
     git reset --hard --quiet "$LOCAL" >> "$LOG_FILE" 2>&1
-    [ -f "$BACKUP_DIR/config.json" ]   && cp "$BACKUP_DIR/config.json"   "$INSTALL_DIR/config.json"
-    [ -f "$BACKUP_DIR/protectado.db" ] && cp "$BACKUP_DIR/protectado.db" "$INSTALL_DIR/protectado.db"
+    mkdir -p "$INSTALL_DIR/data"
+    [ -f "$BACKUP_DIR/config.json" ]   && cp "$BACKUP_DIR/config.json"   "$INSTALL_DIR/data/config.json"
+    [ -f "$BACKUP_DIR/protectado.db" ] && cp "$BACKUP_DIR/protectado.db" "$INSTALL_DIR/data/protectado.db"
     .venv/bin/python -c "import database; database.init_db()" >> "$LOG_FILE" 2>&1
     systemctl restart protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
     sleep 3
@@ -306,6 +312,9 @@ step3_protectado() {
   "$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt" 2>&1 | tee -a "$LOG_FILE"
   ok "Environnement Python prêt"
 
+  # Répertoire de données (seul répertoire inscriptible par l'agent)
+  mkdir -p "$INSTALL_DIR/data"
+
   # Initialiser la base de données
   cd "$INSTALL_DIR"
   .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
@@ -419,10 +428,42 @@ step6_summary() {
   echo ""
 }
 
+# ── Purge ────────────────────────────────────────────────────────────────────
+run_purge() {
+  echo ""
+  echo "╔══════════════════════════════════════════════════╗"
+  echo "║     Protectado — Désinstallation complète       ║"
+  echo "╚══════════════════════════════════════════════════╝"
+  echo ""
+  read -rp "  ⚠  Supprimer TOUTE l'installation (code + données) ? [oui/N] : " CONFIRM
+  [ "$CONFIRM" != "oui" ] && echo "Annulé." && exit 0
+
+  systemctl stop  protectado-agent protectado-runner 2>/dev/null || true
+  systemctl disable protectado-agent protectado-runner 2>/dev/null || true
+  rm -f /etc/systemd/system/protectado-agent.service
+  rm -f /etc/systemd/system/protectado-runner.service
+  systemctl daemon-reload
+
+  rm -f /etc/cron.d/protectado
+  rm -rf /etc/protectado
+  rm -rf "$INSTALL_DIR"
+  rm -f /var/log/protectado-*.log /var/log/fw-*.log
+
+  echo ""
+  echo "  ✓ Installation supprimée."
+  echo "  Pour réinstaller : curl -fsSL https://code.barbed.fr/abyss/protectado/raw/branch/main/bootstrap/bootstrap.sh | sudo bash"
+  echo ""
+}
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 main() {
   check_root
   touch "$LOG_FILE"
+
+  if [ "${1:-}" = "purge" ]; then
+    run_purge
+    exit 0
+  fi
 
   # Détection : installation existante → mise à jour, sinon → installation initiale
   if detect_existing; then

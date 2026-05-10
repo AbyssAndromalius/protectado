@@ -9,6 +9,7 @@
   },
   "filesystem": {
     "allow": [
+      "__WORKDIR__/data",
       "/tmp/fw-queue"
     ]
   },
@@ -23,7 +24,7 @@
     "open_port": [80, 8080]
   },
   "workdir": {
-    "access": "readwrite"
+    "access": "read"
   },
   "interactive": false
 }
