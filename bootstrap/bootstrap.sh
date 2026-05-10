@@ -178,7 +178,7 @@ step2_pihole() {
 
   if command -v pihole &>/dev/null; then
     # Vérifier que c'est bien Pi-hole v6 (l'API REST n'existe qu'en v6)
-    PIHOLE_VER=$(pihole version 2>/dev/null | grep -oP 'Pi-hole version v\K[0-9]+' | head -1 || echo "0")
+    PIHOLE_VER=$(pihole version 2>/dev/null | grep -oP '(?:Pi-hole|Core) version(?: is)? v\K[0-9]+' | head -1 || echo "0")
     if [ "$PIHOLE_VER" -lt 6 ] 2>/dev/null; then
       echo "❌  Pi-hole v$PIHOLE_VER détecté — Protectado requiert Pi-hole v6."
       echo "    Mettez à jour Pi-hole : pihole -up"
