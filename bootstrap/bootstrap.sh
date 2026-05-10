@@ -17,7 +17,7 @@ trap 'echo ""; echo "❌  Erreur à la ligne $LINENO — arrêt."; echo ""; tail
 
 # ── Configuration ────────────────────────────────────────────────────────────
 REPO_URL="https://code.barbed.fr/abyss/protectado.git"
-BRANCH="release"
+BRANCH="main"
 INSTALL_DIR="/opt/protectado"
 LOG_FILE="/var/log/protectado-bootstrap.log"
 INFO_FILE="/tmp/fw-setup-info.txt"
