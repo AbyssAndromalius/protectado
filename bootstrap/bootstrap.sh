@@ -13,7 +13,7 @@
 #   - SSH actif
 
 set -euo pipefail
-trap 'echo ""; echo "❌  Erreur à la ligne $LINENO — arrêt."; echo "    Logs : $LOG_FILE"; exit 1' ERR
+trap 'echo ""; echo "❌  Erreur à la ligne $LINENO — arrêt."; echo ""; tail -5 "$LOG_FILE" 2>/dev/null | sed "s/^/    /"; echo ""; echo "    Logs complets : $LOG_FILE"; exit 1' ERR
 
 # ── Configuration ────────────────────────────────────────────────────────────
 REPO_URL="https://code.barbed.fr/abyss/protectado.git"
@@ -227,13 +227,22 @@ step3_protectado() {
 
   if [ -d "$INSTALL_DIR/.git" ]; then
     log "   Mise à jour depuis git..."
-    git -C "$INSTALL_DIR" fetch origin >> "$LOG_FILE" 2>&1
-    git -C "$INSTALL_DIR" checkout "$BRANCH" >> "$LOG_FILE" 2>&1
-    git -C "$INSTALL_DIR" pull origin "$BRANCH" >> "$LOG_FILE" 2>&1
-    ok "Dépôt mis à jour"
+    if git -C "$INSTALL_DIR" fetch origin 2>&1 | tee -a "$LOG_FILE"; then
+      if git -C "$INSTALL_DIR" checkout "$BRANCH" 2>&1 | tee -a "$LOG_FILE"; then
+        git -C "$INSTALL_DIR" pull origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE" \
+          || log "   ⚠ pull échoué — code local conservé"
+        ok "Dépôt mis à jour (branche $BRANCH)"
+      else
+        log "   ⚠ Branche '$BRANCH' introuvable — branche actuelle conservée"
+        ok "Dépôt prêt"
+      fi
+    else
+      log "   ⚠ fetch échoué (réseau ?) — utilisation du code local"
+      ok "Dépôt prêt (hors ligne)"
+    fi
   else
     log "   Clonage du dépôt..."
-    git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+    git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>&1 | tee -a "$LOG_FILE"
     ok "Dépôt cloné"
   fi
 
@@ -261,14 +270,14 @@ step3_protectado() {
 
   # Environnement Python
   log "   Création du venv Python..."
-  python3 -m venv "$INSTALL_DIR/.venv" >> "$LOG_FILE" 2>&1
-  "$INSTALL_DIR/.venv/bin/pip" install -q --upgrade pip >> "$LOG_FILE" 2>&1
-  "$INSTALL_DIR/.venv/bin/pip" install -q -r "$INSTALL_DIR/requirements.txt" >> "$LOG_FILE" 2>&1
+  python3 -m venv "$INSTALL_DIR/.venv" 2>&1 | tee -a "$LOG_FILE"
+  "$INSTALL_DIR/.venv/bin/pip" install -q --upgrade pip 2>&1 | tee -a "$LOG_FILE"
+  "$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt" 2>&1 | tee -a "$LOG_FILE"
   ok "Environnement Python prêt"
 
   # Initialiser la base de données
   cd "$INSTALL_DIR"
-  .venv/bin/python -c "import database; database.init_db()" >> "$LOG_FILE" 2>&1
+  .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
   ok "Base de données initialisée"
 }
 
