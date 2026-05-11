@@ -908,6 +908,29 @@
       }
     }
 
+    const _SLOT_COLOR = { blocked: '#f87171', work: '#60a5fa', permissive: '#c084fc' };
+    const _SLOT_LABEL = { blocked: 'Bloqué', work: 'Travail', permissive: 'Permissif' };
+
+    function renderSlotReadOnly(schedule) {
+      return ['weekday', 'weekend'].map(dt => {
+        const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
+        if (!slots.length) return '';
+        const label = dt === 'weekday' ? T['profiles.weekday'] : T['profiles.weekend'];
+        const chips = slots.map(s => {
+          const col = _SLOT_COLOR[s.mode] || '#94a3b8';
+          const lbl = _SLOT_LABEL[s.mode] || s.mode;
+          return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:2px 8px;font-size:0.75rem;color:#e2e8f0">
+            ${s.start}–${s.end}
+            <span style="color:${col};font-weight:700">· ${lbl}</span>
+          </span>`;
+        }).join('');
+        return `<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px;flex-wrap:wrap">
+          <span style="color:#64748b;font-size:0.72rem;font-weight:600;min-width:58px;padding-top:3px">${label}</span>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
+        </div>`;
+      }).join('');
+    }
+
     function renderProfilesList() {
       const container = document.getElementById('profiles-list-ui');
       const entries = Object.entries(profilesData).filter(([k]) => k !== 'monitoring');
@@ -917,7 +940,6 @@
       }
       container.innerHTML = entries.map(([key, p]) => {
         const deviceCount = (p.devices || []).length;
-        const slotCount = Object.values(p.schedule || {}).flat().length;
         const isEditing = editingProfile === key;
         return `
           <div class="card" style="margin-bottom:12px">
@@ -925,7 +947,7 @@
               <div>
                 <span class="card-title">👤 ${p.name}</span>
                 ${p.age ? `<span class="age"> · ${p.age} ${T['dashboard.profile.age_suffix']}</span>` : ''}
-                <span style="color:#475569;font-size:0.75rem;margin-left:8px">${tr('profiles.devices_count',{n:deviceCount})} · ${tr('profiles.slots_count',{n:slotCount})}</span>
+                <span style="color:#475569;font-size:0.75rem;margin-left:8px">${tr('profiles.devices_count',{n:deviceCount})}</span>
               </div>
               <div style="display:flex;gap:6px">
                 ${isEditing
@@ -935,9 +957,19 @@
                 }
               </div>
             </div>
-            ${isEditing ? renderProfileEditor(key, p) : ''}
+            ${isEditing
+              ? renderProfileEditor(key, p)
+              : `<div style="padding-top:10px;border-top:1px solid #1e293b">${renderSlotReadOnly(p.schedule || {})}</div>`
+            }
           </div>`;
       }).join('');
+    }
+
+    function _sortSchedule(key) {
+      const sched = profilesData[key].schedule || {};
+      for (const dt of ['weekday', 'weekend']) {
+        if (sched[dt]) sched[dt].sort((a, b) => a.start.localeCompare(b.start));
+      }
     }
 
     function renderProfileEditor(key, p) {
@@ -954,16 +986,19 @@
               <input type="number" id="ep-age-${key}" value="${p.age || ''}" min="1" max="99" style="width:70px">
             </div>
           </div>
-          ${['weekday','weekend'].map(dt => `
+          ${['weekday','weekend'].map(dt => {
+            const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
+            return `
             <div style="margin-bottom:20px">
               <div style="font-size:0.8rem;font-weight:600;color:#94a3b8;margin-bottom:10px">
                 ${dt === 'weekday' ? T['profiles.weekday'] : T['profiles.weekend']}
               </div>
               <div id="slots-${key}-${dt}">
-                ${(schedule[dt] || []).map((s,i) => slotRow(key, dt, i, s)).join('')}
+                ${slots.map((s,i) => slotRow(key, dt, i, s)).join('')}
               </div>
               <button class="btn-edit" style="font-size:0.75rem;margin-top:6px" onclick="addSlot('${key}','${dt}')">${T['profiles.add_slot']}</button>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
           <button class="btn-primary" onclick="saveProfile('${key}')">${T['profiles.save_btn']}</button>
         </div>`;
     }
@@ -988,14 +1023,19 @@
       if (!schedule[dt]) schedule[dt] = [];
       schedule[dt].push({ start: '08:00', end: '20:00', mode: 'permissive' });
       profilesData[key].schedule = schedule;
+      _sortSchedule(key);
       editingProfile = key;
       renderProfilesList();
     }
 
-    function removeSlot(key, dt, i) { profilesData[key].schedule[dt].splice(i, 1); renderProfilesList(); }
+    function removeSlot(key, dt, i) {
+      profilesData[key].schedule[dt].splice(i, 1);
+      renderProfilesList();
+    }
     function startEditProfile(key) {
       editingProfile = key;
       if (!profilesData[key].schedule) profilesData[key].schedule = { weekday: [], weekend: [] };
+      _sortSchedule(key);
       renderProfilesList();
     }
     function cancelEditProfile() { editingProfile = null; loadProfiles(); }
@@ -1006,6 +1046,7 @@
       const name = nameEl.value.trim();
       if (!name) { nameEl.style.borderColor = '#ef4444'; return; }
       const age = ageEl.value ? parseInt(ageEl.value) : null;
+      _sortSchedule(key);
       try {
         await fetch(`/api/profiles/${key}`, {
           method: 'POST',
