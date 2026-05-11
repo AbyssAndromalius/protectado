@@ -318,17 +318,16 @@ async def last_report():
 @app.post("/api/report/generate")
 async def generate_report():
     import subprocess, sys
-    loop = asyncio.get_event_loop()
-    venv_python = str(DATA_DIR.parent / "venv" / "bin" / "python3")
-    script = str(DATA_DIR.parent / "daily_report.py")
+    base = os.path.dirname(DATA_DIR)
+    venv_python = os.path.join(base, "venv", "bin", "python3")
+    script = os.path.join(base, "daily_report.py")
     python = venv_python if os.path.exists(venv_python) else sys.executable
+    loop = asyncio.get_event_loop()
     def _run():
-        result = subprocess.run(
+        return subprocess.run(
             [python, script],
-            capture_output=True, text=True, timeout=120,
-            cwd=str(DATA_DIR.parent)
+            capture_output=True, text=True, timeout=120, cwd=base
         )
-        return result
     try:
         result = await loop.run_in_executor(None, _run)
         if result.returncode == 0:
