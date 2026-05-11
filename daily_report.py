@@ -8,7 +8,11 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 import domain_classifier as classifier
 import claude_agent
+import database as db
 from paths import CONFIG_PATH
+
+# 0. Purger la timeline DNS (entrées > 7 jours)
+db.purge_old_timeline(days=7)
 
 # 1. Charger la config
 with open(CONFIG_PATH) as f:

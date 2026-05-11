@@ -306,12 +306,18 @@ class PiHoleAPI:
         # Groupe adulte global — aucune liste de blocage, accès total
         self.create_group("adult-override", "Protectado — Mode adulte (accès total)")
 
-        # 2. Bloquer tout le DNS pour les groupes blocked
+        # 2. Bloquer tout le DNS pour les groupes blocked — idempotent
+        existing_deny = self.get_deny_domains()
+        wildcard_group_ids: set[int] = set()
+        for d in existing_deny:
+            if d["domain"] == ".*":
+                wildcard_group_ids.update(d.get("groups", []))
+
         for profile_name, profile in profiles.items():
             if profile.get("mode") == "monitoring":
                 continue
             blocked_gid = all_group_ids.get(f"{profile_name}-blocked")
-            if blocked_gid:
+            if blocked_gid and blocked_gid not in wildcard_group_ids:
                 self._post("/domains/deny/regex", {
                     "domain": ".*",
                     "comment": f"protectado:blocked:{profile_name}",
@@ -366,18 +372,44 @@ class PiHoleAPI:
     def _sync_blacklist(self, group_id: int, mode: str, domains: list):
         r"""
         Synchronise la blacklist vers un groupe Pi-hole.
-        Utilise des patterns regex (.*\.)?domain\.tld$ pour couvrir les sous-domaines.
-        - Nouveaux domaines → ajoutés avec le groupe cible.
-        - Domaines existants sans le groupe cible → groupe ajouté par DELETE+POST.
+        - Ajoute les nouveaux domaines avec le groupe cible.
+        - Met à jour les entrées existantes manquant le groupe cible.
+        - Retire le groupe des entrées obsolètes (supprime si aucun groupe restant).
+        Gère les doublons de pattern (même regex, groupes différents) par fusion.
         Les entrées sont taguées "protectado:{mode}" pour permettre cleanup/audit.
         """
-        if not domains:
-            return
-
         tag = f"protectado:{mode}"
-        existing = {d["domain"]: d for d in self.get_deny_domains()}
-        added = updated = 0
+        target_patterns = {self._domain_to_pattern(d) for d in domains}
 
+        # Construire l'état courant — fusionner les groupes si doublons de pattern
+        existing: dict[str, dict] = {}
+        for d in self.get_deny_domains():
+            pat = d["domain"]
+            if pat not in existing:
+                existing[pat] = dict(d)
+            else:
+                merged = list(set(existing[pat].get("groups", []) + d.get("groups", [])))
+                existing[pat]["groups"] = merged
+
+        added = removed = updated = 0
+
+        # Retirer le groupe des entrées protectado qui ne sont plus dans la cible
+        for pattern, entry in existing.items():
+            if (entry.get("comment", "").startswith("protectado:")
+                    and group_id in entry.get("groups", [])
+                    and pattern not in target_patterns):
+                remaining = [g for g in entry.get("groups", []) if g != group_id]
+                self._delete(f"/domains/deny/regex/{urlquote(pattern, safe='')}")
+                if remaining:
+                    self._post("/domains/deny/regex", {
+                        "domain": pattern,
+                        "comment": entry.get("comment", tag),
+                        "enabled": True,
+                        "groups": remaining,
+                    })
+                removed += 1
+
+        # Ajouter / mettre à jour les entrées cibles
         for domain in domains:
             pattern = self._domain_to_pattern(domain)
             if pattern not in existing:
@@ -395,14 +427,14 @@ class PiHoleAPI:
                     self._delete(f"/domains/deny/regex/{urlquote(pattern, safe='')}")
                     self._post("/domains/deny/regex", {
                         "domain": pattern,
-                        "comment": tag,
+                        "comment": existing[pattern].get("comment", tag),
                         "enabled": True,
                         "groups": merged
                     })
                     updated += 1
 
-        if added or updated:
-            print(f"[PiHole] blacklist groupe {group_id} ({mode}) : {added} ajoutés, {updated} mis à jour")
+        if added or removed or updated:
+            print(f"[PiHole] blacklist groupe {group_id} ({mode}) : {added} ajoutés, {removed} retirés, {updated} mis à jour")
 
     # ------------------------------------------------------------------ #
     #  API métier (requêtes DNS)                                          #

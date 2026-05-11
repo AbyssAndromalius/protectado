@@ -63,8 +63,9 @@ class ProtectadoMonitor:
         self._running = False
         self._wakeup = threading.Event()
         self._unusual_events = []  # buffer avant escalade vers Claude
-        self._block_state: dict = {}  # (profile, domain) → état déduplication
-        self._last_slot: dict = {}   # profile → dernier mode détecté
+        self._block_state: dict = {}   # (profile, domain) → état déduplication
+        self._bypass_state: dict = {}  # (profile, ip) → datetime dernière alerte
+        self._last_slot: dict = {}     # profile → dernier mode détecté
 
         db.init_db()
 
@@ -153,9 +154,15 @@ class ProtectadoMonitor:
         if current_mode == "blocked":
             return
 
+        now = datetime.now()
         for device in profile.get("devices", []):
             ip = device["ip"]
             if ip in active_ips and len(queries_by_ip.get(ip, [])) == 0:
+                key = (profile_key, ip)
+                last_warn = self._bypass_state.get(key)
+                if last_warn and (now - last_warn).total_seconds() < BLOCK_WINDOW_SEC:
+                    continue
+                self._bypass_state[key] = now
                 label = device.get("name") or device.get("mac") or ip
                 msg = (f"Bypass DNS suspecté sur {label} ({ip}) "
                        f"— appareil actif sans requêtes DNS")

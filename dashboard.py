@@ -232,10 +232,14 @@ async def dashboard(request: Request):
 
 @app.get("/api/status")
 async def status():
+    loop = asyncio.get_event_loop()
     m = get_monitor()
     config = m.config
-    active_ips = m.scanner.get_active_ips()
-    queries = m.pihole.get_recent_queries(minutes=5)
+
+    active_ips, queries = await asyncio.gather(
+        loop.run_in_executor(None, m.scanner.get_active_ips),
+        loop.run_in_executor(None, lambda: m.pihole.get_recent_queries(minutes=5)),
+    )
     by_ip = m.pihole.queries_by_client(queries)
 
     profiles_data = {}

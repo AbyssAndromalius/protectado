@@ -43,8 +43,11 @@ def get_pihole_api():
 
 ACTION_QUEUE_DIR = "/tmp/fw-queue"
 LOG_FILE = "/var/log/protectado-runner.log"
-POLL_INTERVAL = 2      # secondes
-ACTION_MAX_AGE = 300   # rejeter les actions > 5 min (évite replay d'actions figées)
+POLL_INTERVAL = 2        # secondes
+ACTION_MAX_AGE = 300     # rejeter les actions > 5 min (évite replay d'actions figées)
+CLEANUP_INTERVAL = 3600  # nettoyage des fichiers .error/.stale toutes les heures
+
+_last_cleanup = 0.0
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,7 +122,7 @@ def apply_pihole_mode(args: dict):
             profile_name=profile,
             mode=mode,
             device_ips=device_ips,
-            blacklist=blacklist if blacklist else None
+            blacklist=None if mode == "blocked" else blacklist
         )
 
         if not ok:
@@ -132,7 +135,7 @@ def apply_pihole_mode(args: dict):
                 profile_name=profile,
                 mode=mode,
                 device_ips=device_ips,
-                blacklist=blacklist if blacklist else None
+                blacklist=None if mode == "blocked" else blacklist
             )
 
         if ok:
@@ -147,6 +150,18 @@ def apply_pihole_mode(args: dict):
 HANDLERS = {
     "apply_pihole_mode": apply_pihole_mode,
 }
+
+
+def _cleanup_stale_files():
+    """Supprime les fichiers .error et .stale de plus d'une heure."""
+    for ext in ("*.error", "*.stale"):
+        for path in glob.glob(os.path.join(ACTION_QUEUE_DIR, ext)):
+            try:
+                if time.time() - os.path.getmtime(path) > CLEANUP_INTERVAL:
+                    os.remove(path)
+                    log.info(f"Nettoyage : {os.path.basename(path)}")
+            except OSError:
+                pass
 
 
 # ------------------------------------------------------------------ #
@@ -204,6 +219,12 @@ def main():
     log.info(f"Protectado action runner démarré — surveillance {ACTION_QUEUE_DIR}")
 
     while True:
+        global _last_cleanup
+        now_ts = time.time()
+        if now_ts - _last_cleanup > CLEANUP_INTERVAL:
+            _cleanup_stale_files()
+            _last_cleanup = now_ts
+
         files = sorted(glob.glob(os.path.join(ACTION_QUEUE_DIR, "action-*.json")))
         for f in files:
             process_action_file(f)

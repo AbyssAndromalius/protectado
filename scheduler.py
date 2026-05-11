@@ -16,8 +16,8 @@ MODE_LABELS = {
     "permissive": "🟢 Libre",
 }
 
-# Extensions de slot en mémoire (non persistées) — cf. extend_current_slot
-_slot_extensions: dict[str, int] = {}
+# Extensions de slot en mémoire (non persistées) — (minutes, date_iso)
+_slot_extensions: dict[str, tuple[int, str]] = {}
 
 
 def _load_config() -> dict:
@@ -43,7 +43,8 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
     day_type = "weekend" if is_weekend else "weekday"
     schedule_list = profile_data.get("schedule", {}).get(day_type, [])
     current_time = now.time()
-    extra_min = _slot_extensions.get(profile, 0)
+    ext_raw = _slot_extensions.get(profile, (0, ""))
+    extra_min = ext_raw[0] if ext_raw[1] == now.date().isoformat() else 0
 
     for slot in schedule_list:
         start = _parse_time(slot["start"])
@@ -89,7 +90,10 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
 
 
 def extend_current_slot(profile: str, minutes: int) -> bool:
-    _slot_extensions[profile] = _slot_extensions.get(profile, 0) + minutes
+    today = datetime.now().date().isoformat()
+    current_minutes, current_date = _slot_extensions.get(profile, (0, today))
+    accumulated = current_minutes if current_date == today else 0
+    _slot_extensions[profile] = (accumulated + minutes, today)
     return True
 
 
