@@ -91,6 +91,17 @@
     .field input:focus, .field select:focus { border-color: #3b82f6; }
     .field.error input, .field.error select { border-color: #ef4444; }
     .hint { font-size: 0.75rem; color: #475569; margin-top: 5px; }
+    .ai-warn {
+      margin-top: 16px;
+      background: #451a03;
+      border: 1px solid #78350f;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      color: #fcd34d;
+    }
+    .ai-warn ul { margin: 6px 0 0 16px; color: #fbbf24; }
+    .ai-warn li { margin-top: 3px; }
     .err-msg { font-size: 0.75rem; color: #f87171; margin-top: 5px; display: none; }
     .field.error .err-msg { display: block; }
 
@@ -299,8 +310,16 @@
     <p class="step-desc" id="s4-desc"></p>
     <div class="field" id="f-or-key">
       <label id="lbl-or-key"></label>
-      <input type="text" id="or-key" placeholder="sk-or-..." autocomplete="off">
+      <input type="text" id="or-key" placeholder="sk-or-..." autocomplete="off" oninput="updateAiWarn()">
       <div class="err-msg" id="err-or-key"></div>
+    </div>
+    <div id="ai-warn" class="ai-warn">
+      <span id="ai-warn-title"></span>
+      <ul>
+        <li id="ai-warn-chat"></li>
+        <li id="ai-warn-report"></li>
+        <li id="ai-warn-analysis"></li>
+      </ul>
     </div>
     <div class="field">
       <label id="lbl-or-model"></label>
@@ -424,11 +443,15 @@
     setText('err-pihole-pw',   t('setup.pihole.password_required'));
 
     // Step 4
-    setText('s4-title',    t('setup.ai.title'));
-    setText('s4-desc',     t('setup.ai.desc'));
-    setText('lbl-or-key',  t('setup.ai.key_label'));
-    setText('err-or-key',  t('setup.ai.key_required'));
-    setText('lbl-or-model',t('setup.ai.model_label'));
+    setText('s4-title',       t('setup.ai.title'));
+    setText('s4-desc',        t('setup.ai.desc'));
+    setText('lbl-or-key',     t('setup.ai.key_label'));
+    setText('err-or-key',     t('setup.ai.key_required'));
+    setText('lbl-or-model',   t('setup.ai.model_label'));
+    setText('ai-warn-title',  t('setup.ai.no_key_warn'));
+    setText('ai-warn-chat',   t('setup.ai.no_key_feat_chat'));
+    setText('ai-warn-report', t('setup.ai.no_key_feat_report'));
+    setText('ai-warn-analysis', t('setup.ai.no_key_feat_analysis'));
 
     // Step 5
     setText('s5-title', t('setup.password.title'));
@@ -582,6 +605,7 @@
     }
 
     if (step === 4) {
+      updateAiWarn();
       // Clé OpenRouter optionnelle — pas de blocage si absente
     }
 
@@ -618,6 +642,11 @@
     const el = document.getElementById('pihole-status');
     el.className = 'test-status ' + cls;
     el.textContent = msg;
+  }
+
+  function updateAiWarn() {
+    const hasKey = document.getElementById('or-key').value.trim().length > 0;
+    document.getElementById('ai-warn').style.display = hasKey ? 'none' : '';
   }
 
   async function testPihole() {
