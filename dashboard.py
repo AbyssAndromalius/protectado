@@ -81,7 +81,6 @@ def _save_config(config: dict):
     with open(tmp, "w") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
     os.replace(tmp, CONFIG_PATH)
-    _clear_ai_status_cache()
     global monitor
     if monitor:
         monitor.reload_config()
@@ -305,42 +304,11 @@ async def status():
     return JSONResponse(data)
 
 
-_ai_status_cache: dict = {}   # {"available": bool, "reason": str, "ts": float}
-_AI_STATUS_TTL = 60           # secondes
-
-def _clear_ai_status_cache():
-    global _ai_status_cache
-    _ai_status_cache = {}
-
-
 @app.get("/api/ai/status")
 async def ai_status():
-    import time, requests as _req
     config = _load_config()
     key = config.get("openrouter", {}).get("api_key", "")
-    if not key:
-        return JSONResponse({"available": False, "reason": "not_configured"})
-
-    now = time.monotonic()
-    if _ai_status_cache and now - _ai_status_cache.get("ts", 0) < _AI_STATUS_TTL:
-        return JSONResponse({"available": _ai_status_cache["available"],
-                             "reason":    _ai_status_cache["reason"]})
-
-    def _probe():
-        try:
-            r = _req.get(
-                "https://openrouter.ai/api/v1/auth/key",
-                headers={"Authorization": f"Bearer {key}"},
-                timeout=5
-            )
-            return (True, "ok") if r.status_code == 200 else (False, f"http_{r.status_code}")
-        except Exception:
-            return (False, "network_error")
-
-    loop = asyncio.get_event_loop()
-    available, reason = await loop.run_in_executor(None, _probe)
-    _ai_status_cache.update({"available": available, "reason": reason, "ts": now})
-    return JSONResponse({"available": available, "reason": reason})
+    return JSONResponse({"available": bool(key), "reason": "ok" if key else "not_configured"})
 
 
 @app.get("/api/report")
@@ -507,10 +475,27 @@ class ChatMessage(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
 
 
+class AiKeyUpdate(BaseModel):
+    key: str = ""
+
+
+@app.post("/api/ai/key")
+async def update_ai_key(body: AiKeyUpdate):
+    key = body.key.strip()
+    config = _load_config()
+    config.setdefault("openrouter", {})["api_key"] = key
+    _save_config(config)
+    return JSONResponse({"ok": True})
+
+
 @app.post("/api/chat")
 async def chat(body: ChatMessage):
-    reply = claude_agent.chat(body.message)
-    return JSONResponse({"reply": reply})
+    try:
+        from openai import AuthenticationError as _OAIAuth
+        reply = claude_agent.chat(body.message)
+        return JSONResponse({"reply": reply})
+    except _OAIAuth:
+        return JSONResponse({"reply": "Clé API invalide ou révoquée.", "ai_available": False})
 
 
 # ------------------------------------------------------------------ #

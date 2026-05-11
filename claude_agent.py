@@ -16,7 +16,7 @@ import json
 import os
 import threading
 from datetime import datetime
-from openai import OpenAI
+from openai import OpenAI, AuthenticationError as _AuthError
 from paths import CONFIG_PATH
 
 import database as db
@@ -577,9 +577,10 @@ def chat(user_message: str) -> str:
 
         return msg.content
 
+    except _AuthError:
+        raise  # dashboard.py affiche le panel de mise à jour de clé
     except Exception as e:
-        msg = str(e)
-        if "openrouter" in msg.lower() or "api_key" in msg.lower() or isinstance(e, KeyError):
+        if isinstance(e, KeyError):
             return "IA non configurée — ajoutez une clé OpenRouter dans les paramètres."
         return f"IA indisponible : {e}"
 

@@ -241,7 +241,17 @@
       <div class="card-header">
         <span class="card-title">💬 {{ t['dashboard.chat.title'] }} <span id="chat-ai-badge" style="display:none" class="ai-off-badge">{{ t['dashboard.ai.off_badge'] }}</span></span>
       </div>
-      <div id="chat-ai-notice" style="display:none" class="ai-notice">{{ t['dashboard.ai.no_key_chat'] }}</div>
+      <div id="chat-ai-notice" style="display:none" class="ai-notice">
+        <span id="chat-ai-notice-msg">{{ t['dashboard.ai.no_key_chat'] }}</span>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="ai-key-input"
+            placeholder="{{ t['dashboard.ai.key_placeholder'] }}"
+            style="flex:1;min-width:180px;background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:7px 10px;border-radius:6px;font-size:0.8rem;outline:none"
+            onkeydown="if(event.key==='Enter')saveAiKey()">
+          <button onclick="saveAiKey()" style="background:#3b82f6;color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:0.8rem;font-weight:500;cursor:pointer;white-space:nowrap">{{ t['dashboard.ai.key_save_btn'] }}</button>
+        </div>
+        <span id="ai-key-save-status" style="display:block;font-size:0.75rem;margin-top:6px"></span>
+      </div>
       <div id="chat-area">
         <div class="chat-messages" id="chat-messages">
           <div class="msg msg-agent">{{ t['dashboard.chat.welcome'] }}</div>
@@ -670,6 +680,7 @@
 
         thinking.innerHTML = renderMarkdown(data.reply);
         thinking.className = "msg msg-agent";
+        if (data.ai_available === false) applyAiStatus(false, data.reply);
       } catch(e) {
         thinking.textContent = T['dashboard.chat.conn_error'];
         thinking.className = "msg msg-agent";
@@ -1284,21 +1295,56 @@
 
     let aiAvailable = true;
 
-    function applyAiStatus(available) {
+    function applyAiStatus(available, noticeMsg) {
       aiAvailable = available;
-      if (available) return;
 
-      // Rapport : badge + notice + bouton générer désactivé
-      document.getElementById('report-ai-badge').style.display = '';
-      document.getElementById('report-ai-notice').style.display = '';
+      // Rapport : badge + notice + bouton générer
+      document.getElementById('report-ai-badge').style.display  = available ? 'none' : '';
+      document.getElementById('report-ai-notice').style.display = available ? 'none' : '';
       const genBtn = document.getElementById('report-generate-btn');
-      genBtn.disabled = true;
-      genBtn.title = T['dashboard.ai.no_key_report'];
+      genBtn.disabled = !available;
+      genBtn.title    = available ? '' : T['dashboard.ai.no_key_report'];
 
-      // Chat : badge + notice + zone saisie grisée
-      document.getElementById('chat-ai-badge').style.display = '';
-      document.getElementById('chat-ai-notice').style.display = '';
-      document.getElementById('chat-area').classList.add('ai-disabled-area');
+      // Chat : badge + notice + zone saisie
+      document.getElementById('chat-ai-badge').style.display  = available ? 'none' : '';
+      document.getElementById('chat-ai-notice').style.display = available ? 'none' : '';
+      document.getElementById('chat-area').classList.toggle('ai-disabled-area', !available);
+
+      if (!available) {
+        if (noticeMsg) document.getElementById('chat-ai-notice-msg').textContent = noticeMsg;
+        document.getElementById('ai-key-save-status').textContent = '';
+        document.getElementById('ai-key-input').value = '';
+      }
+    }
+
+    async function saveAiKey() {
+      const input  = document.getElementById('ai-key-input');
+      const status = document.getElementById('ai-key-save-status');
+      const key = input.value.trim();
+      if (!key) return;
+
+      status.textContent  = '…';
+      status.style.color  = '#64748b';
+
+      try {
+        const res = await fetch('/api/ai/key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        }).then(r => r.json());
+
+        if (res.ok) {
+          status.textContent = T['dashboard.ai.key_saved'];
+          status.style.color = '#4ade80';
+          setTimeout(() => applyAiStatus(true), 800);
+        } else {
+          status.textContent = T['dashboard.ai.key_save_error'];
+          status.style.color = '#f87171';
+        }
+      } catch (_) {
+        status.textContent = T['dashboard.ai.key_save_error'];
+        status.style.color = '#f87171';
+      }
     }
 
     async function checkAiStatus() {
