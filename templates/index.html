@@ -386,6 +386,32 @@
     </div>
   </div>
 
+  <!-- Modal Takeover -->
+  <div class="modal-overlay" id="takeover-modal">
+    <div class="modal-box">
+      <div class="modal-title">{{ t['modal.takeover.title'] }}</div>
+      <input type="hidden" id="takeover-ip">
+      <div class="modal-field">
+        <label>{{ t['modal.takeover.duration'] }}</label>
+        <select id="takeover-duration">
+          <option value="30">{{ t['modal.takeover.30min'] }}</option>
+          <option value="60" selected>{{ t['modal.takeover.1h'] }}</option>
+          <option value="120">{{ t['modal.takeover.2h'] }}</option>
+          <option value="240">{{ t['modal.takeover.4h'] }}</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>{{ t['modal.takeover.password'] }}</label>
+        <input type="password" id="takeover-password" placeholder="••••••••">
+      </div>
+      <div id="takeover-error" style="color:#f87171;font-size:0.78rem;min-height:18px"></div>
+      <div class="modal-actions">
+        <button class="btn-release" onclick="closeTakeoverModal()">{{ t['modal.takeover.cancel'] }}</button>
+        <button class="btn-takeover" id="takeover-confirm-btn" onclick="confirmTakeover()">{{ t['modal.takeover.confirm'] }}</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ================================================================ //
     //  Translations                                                     //
@@ -1110,7 +1136,7 @@
       loadStatus();
     }
 
-    document.getElementById('takeover-modal').addEventListener('click', function(e) {
+    document.getElementById('takeover-modal')?.addEventListener('click', function(e) {
       if (e.target === this) closeTakeoverModal();
     });
 
@@ -1118,38 +1144,14 @@
     //  Init                                                             //
     // ================================================================ //
 
-    document.getElementById("ov-date").value = new Date().toISOString().substring(0, 10);
+    const _ovDate = document.getElementById("ov-date");
+    if (_ovDate) _ovDate.value = new Date().toISOString().substring(0, 10);
 
     loadStatus();
     loadReport();
     loadEvents();
   </script>
 
-  <!-- Modal Takeover -->
-  <div class="modal-overlay" id="takeover-modal">
-    <div class="modal-box">
-      <div class="modal-title">{{ t['modal.takeover.title'] }}</div>
-      <input type="hidden" id="takeover-ip">
-      <div class="modal-field">
-        <label>{{ t['modal.takeover.duration'] }}</label>
-        <select id="takeover-duration">
-          <option value="30">{{ t['modal.takeover.30min'] }}</option>
-          <option value="60" selected>{{ t['modal.takeover.1h'] }}</option>
-          <option value="120">{{ t['modal.takeover.2h'] }}</option>
-          <option value="240">{{ t['modal.takeover.4h'] }}</option>
-        </select>
-      </div>
-      <div class="modal-field">
-        <label>{{ t['modal.takeover.password'] }}</label>
-        <input type="password" id="takeover-password" placeholder="••••••••">
-      </div>
-      <div id="takeover-error" style="color:#f87171;font-size:0.78rem;min-height:18px"></div>
-      <div class="modal-actions">
-        <button class="btn-release" onclick="closeTakeoverModal()">{{ t['modal.takeover.cancel'] }}</button>
-        <button class="btn-takeover" id="takeover-confirm-btn" onclick="confirmTakeover()">{{ t['modal.takeover.confirm'] }}</button>
-      </div>
-    </div>
-  </div>
 
 </body>
 </html>
