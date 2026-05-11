@@ -210,7 +210,10 @@
     <div class="card" style="margin-bottom:24px">
       <div class="card-header">
         <span class="card-title">📋 {{ t['dashboard.report.title'] }}</span>
-        <span id="report-date" style="color:#64748b;font-size:0.8rem"></span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="report-date" style="color:#64748b;font-size:0.8rem"></span>
+          <button id="report-generate-btn" class="btn-edit" style="font-size:0.75rem" onclick="generateReport()">{{ t['dashboard.report.generate_btn'] }}</button>
+        </div>
       </div>
       <div id="report-content" style="color:#94a3b8;font-size:0.875rem;line-height:1.7;max-height:300px;overflow-y:auto">{{ t['dashboard.loading'] }}</div>
     </div>
@@ -576,6 +579,28 @@
         content.innerHTML = renderMarkdown(e.message.replace(/^Rapport quotidien\s*:\s*/, ""));
       } catch(_) {
         content.textContent = T['dashboard.report.none'];
+      }
+    }
+
+    async function generateReport() {
+      const btn = document.getElementById('report-generate-btn');
+      const content = document.getElementById('report-content');
+      btn.disabled = true;
+      btn.textContent = T['dashboard.report.generating'] || 'Génération...';
+      content.textContent = T['dashboard.report.generating'] || 'Génération en cours... (peut prendre 30-60s)';
+      try {
+        const r = await fetch('/api/report/generate', { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          await loadReport();
+        } else {
+          content.textContent = 'Erreur : ' + (data.error || 'inconnue');
+        }
+      } catch(e) {
+        content.textContent = 'Erreur réseau';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = T['dashboard.report.generate_btn'] || 'Générer';
       }
     }
 

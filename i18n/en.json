@@ -83,6 +83,8 @@
   "dashboard.loading": "Loading...",
   "dashboard.report.title": "Daily report",
   "dashboard.report.none": "No report available.",
+  "dashboard.report.generate_btn": "Generate now",
+  "dashboard.report.generating": "Generating...",
   "dashboard.chat.title": "Talk to the agent",
   "dashboard.chat.welcome": "Hello! I'm monitoring the network in real time. Ask me anything about a child's activity.",
   "dashboard.chat.placeholder": "E.g. What has [name] been doing since this morning?",

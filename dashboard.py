@@ -315,6 +315,31 @@ async def last_report():
     return JSONResponse(dict(row) if row else {})
 
 
+@app.post("/api/report/generate")
+async def generate_report():
+    import subprocess, sys
+    loop = asyncio.get_event_loop()
+    venv_python = str(DATA_DIR.parent / "venv" / "bin" / "python3")
+    script = str(DATA_DIR.parent / "daily_report.py")
+    python = venv_python if os.path.exists(venv_python) else sys.executable
+    def _run():
+        result = subprocess.run(
+            [python, script],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(DATA_DIR.parent)
+        )
+        return result
+    try:
+        result = await loop.run_in_executor(None, _run)
+        if result.returncode == 0:
+            return JSONResponse({"ok": True})
+        return JSONResponse({"ok": False, "error": result.stderr[-500:]}, status_code=500)
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"ok": False, "error": "Timeout (120s)"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/domains")
 async def domains():
     from domain_classifier import get_all_domains

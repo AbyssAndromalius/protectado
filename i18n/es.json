@@ -83,6 +83,8 @@
   "dashboard.loading": "Cargando...",
   "dashboard.report.title": "Informe diario",
   "dashboard.report.none": "No hay informe disponible.",
+  "dashboard.report.generate_btn": "Generar ahora",
+  "dashboard.report.generating": "Generando...",
   "dashboard.chat.title": "Hablar con el agente",
   "dashboard.chat.welcome": "¡Hola! Estoy monitorizando la red en tiempo real. Hazme una pregunta sobre la actividad de un hijo.",
   "dashboard.chat.placeholder": "Ej: ¿Qué ha estado haciendo [nombre] desde esta mañana?",

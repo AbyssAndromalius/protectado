@@ -83,6 +83,8 @@
   "dashboard.loading": "Chargement...",
   "dashboard.report.title": "Rapport quotidien",
   "dashboard.report.none": "Aucun rapport disponible.",
+  "dashboard.report.generate_btn": "Générer maintenant",
+  "dashboard.report.generating": "Génération en cours...",
   "dashboard.chat.title": "Parler à l'agent",
   "dashboard.chat.welcome": "Bonjour ! Je surveille le réseau en temps réel. Posez-moi une question sur l'activité d'un enfant.",
   "dashboard.chat.placeholder": "Ex : Que fait [prénom] depuis ce matin ?",
