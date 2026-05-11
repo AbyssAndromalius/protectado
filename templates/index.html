@@ -938,23 +938,43 @@
     const _DAY_KEYS   = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
     function renderSlotReadOnly(schedule) {
-      return _DAY_KEYS.map(dt => {
-        const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
-        if (!slots.length) return '';
-        const label = T[`profiles.day.${dt}`] || dt;
-        const chips = slots.map(s => {
+      // Regrouper les jours qui ont le même planning
+      const sig = day => JSON.stringify([...(schedule[day] || [])].sort((a,b) => a.start.localeCompare(b.start)));
+      const groups = new Map();
+      _DAY_KEYS.forEach((day, di) => {
+        const k = sig(day);
+        if (!groups.has(k)) groups.set(k, { dayIndices: [], slots: [...(schedule[day]||[])].sort((a,b)=>a.start.localeCompare(b.start)) });
+        groups.get(k).dayIndices.push(di);
+      });
+      return [...groups.values()].filter(g => g.slots.length).map(g => {
+        // Compresser les jours consécutifs : Lu-Ve plutôt que Lu Ma Me Je Ve
+        const label = _compressDayRanges(g.dayIndices);
+        const chips = g.slots.map(s => {
           const col = _SLOT_COLOR[s.mode] || '#94a3b8';
           const lbl = _SLOT_LABEL[s.mode] || s.mode;
           return `<span style="display:inline-flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:2px 8px;font-size:0.75rem;color:#e2e8f0">
-            ${s.start}–${s.end}
-            <span style="color:${col};font-weight:700">· ${lbl}</span>
+            ${s.start}–${s.end}<span style="color:${col};font-weight:700"> · ${lbl}</span>
           </span>`;
         }).join('');
         return `<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px;flex-wrap:wrap">
-          <span style="color:#64748b;font-size:0.72rem;font-weight:600;min-width:58px;padding-top:3px">${label}</span>
+          <span style="color:#64748b;font-size:0.72rem;font-weight:600;min-width:52px;padding-top:3px;white-space:nowrap">${label}</span>
           <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
         </div>`;
       }).join('');
+    }
+
+    function _compressDayRanges(indices) {
+      if (!indices.length) return '';
+      const runs = [];
+      let start = indices[0], prev = indices[0];
+      for (let k = 1; k < indices.length; k++) {
+        if (indices[k] === prev + 1) { prev = indices[k]; }
+        else { runs.push([start, prev]); start = prev = indices[k]; }
+      }
+      runs.push([start, prev]);
+      return runs.map(([s, e]) =>
+        s === e ? _SHORT_DAYS[s] : (e - s === 1 ? `${_SHORT_DAYS[s]} ${_SHORT_DAYS[e]}` : `${_SHORT_DAYS[s]}-${_SHORT_DAYS[e]}`)
+      ).join(', ');
     }
 
     function renderProfilesList() {
@@ -991,15 +1011,60 @@
       }).join('');
     }
 
-    function _sortSchedule(key) {
-      const sched = profilesData[key].schedule || {};
-      for (const dt of _DAY_KEYS) {
-        if (sched[dt]) sched[dt].sort((a, b) => a.start.localeCompare(b.start));
-      }
+    // ── Conversion planning ↔ templates ────────────────────────────────
+    // Un "template" = une plage horaire (start, end, mode) + tableau de 7 booléens (jours)
+    // Le stockage reste par-jour ; les templates ne servent qu'à l'édition.
+
+    const _SHORT_DAYS = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+    let _editingTemplates = {}; // key → [{start,end,mode,days:[7×bool]}]
+
+    function scheduleToTemplates(schedule) {
+      const map = new Map();
+      _DAY_KEYS.forEach((day, di) => {
+        (schedule[day] || []).forEach(slot => {
+          const k = `${slot.start}|${slot.end}|${slot.mode}`;
+          if (!map.has(k)) map.set(k, { start: slot.start, end: slot.end, mode: slot.mode, days: Array(7).fill(false) });
+          map.get(k).days[di] = true;
+        });
+      });
+      return [...map.values()].sort((a, b) => a.start.localeCompare(b.start));
+    }
+
+    function templatesToSchedule(templates) {
+      const sched = Object.fromEntries(_DAY_KEYS.map(d => [d, []]));
+      templates.forEach(tpl => {
+        _DAY_KEYS.forEach((day, di) => {
+          if (tpl.days[di]) sched[day].push({ start: tpl.start, end: tpl.end, mode: tpl.mode });
+        });
+      });
+      _DAY_KEYS.forEach(day => sched[day].sort((a, b) => a.start.localeCompare(b.start)));
+      return sched;
+    }
+
+    // ── Rendu de l'éditeur ───────────────────────────────────────────────
+
+    function _tplRow(key, tpl, i) {
+      const ts = "background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:0.8rem";
+      const modeOpts = ['blocked','work','permissive'].map(m =>
+        `<option value="${m}"${tpl.mode===m?' selected':''}>${_SLOT_LABEL[m]||m}</option>`
+      ).join('');
+      const dayBoxes = _SHORT_DAYS.map((d, di) => `
+        <label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">
+          <input type="checkbox" ${tpl.days[di]?'checked':''} onchange="toggleTemplateDay('${key}',${i},${di})" style="accent-color:#6366f1;cursor:pointer;width:14px;height:14px">
+          <span style="font-size:0.62rem;font-weight:700;color:${tpl.days[di]?'#e2e8f0':'#475569'}">${d}</span>
+        </label>`).join('');
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:10px 12px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;flex-wrap:wrap">
+        <input type="time" value="${tpl.start}" style="${ts}" onchange="updateTemplate('${key}',${i},'start',this.value)">
+        <span style="color:#475569;font-size:0.8rem">→</span>
+        <input type="time" value="${tpl.end}" style="${ts}" onchange="updateTemplate('${key}',${i},'end',this.value)">
+        <select style="${ts}" onchange="updateTemplate('${key}',${i},'mode',this.value)">${modeOpts}</select>
+        <div style="display:flex;gap:7px;margin-left:6px">${dayBoxes}</div>
+        <button class="btn-danger" style="padding:3px 8px;margin-left:auto" onclick="removeTemplate('${key}',${i})">×</button>
+      </div>`;
     }
 
     function renderProfileEditor(key, p) {
-      const schedule = p.schedule || {};
+      const tmpls = _editingTemplates[key] || [];
       return `
         <div style="padding-top:16px;border-top:1px solid #334155">
           <div class="form-row" style="margin-bottom:20px">
@@ -1012,59 +1077,39 @@
               <input type="number" id="ep-age-${key}" value="${p.age || ''}" min="1" max="99" style="width:70px">
             </div>
           </div>
-          ${_DAY_KEYS.map(dt => {
-            const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
-            return `
-            <div style="margin-bottom:20px">
-              <div style="font-size:0.8rem;font-weight:600;color:#94a3b8;margin-bottom:10px">
-                ${T[`profiles.day.${dt}`] || dt}
-              </div>
-              <div id="slots-${key}-${dt}">
-                ${slots.map((s,i) => slotRow(key, dt, i, s)).join('')}
-              </div>
-              <button class="btn-edit" style="font-size:0.75rem;margin-top:6px" onclick="addSlot('${key}','${dt}')">${T['profiles.add_slot']}</button>
-            </div>`;
-          }).join('')}
-          <button class="btn-primary" onclick="saveProfile('${key}')">${T['profiles.save_btn']}</button>
+          <p style="font-size:0.75rem;color:#64748b;margin:0 0 12px">
+            Les heures non couvertes sont automatiquement <span style="color:#f87171;font-weight:600">Bloquées</span>.
+          </p>
+          <div id="tpl-rows-${key}">
+            ${tmpls.map((tpl, i) => _tplRow(key, tpl, i)).join('')}
+          </div>
+          <button class="btn-edit" style="font-size:0.75rem;margin-bottom:16px" onclick="addTemplate('${key}')">${T['profiles.add_slot']}</button>
+          <div><button class="btn-primary" onclick="saveProfile('${key}')">${T['profiles.save_btn']}</button></div>
         </div>`;
     }
 
-    function slotRow(key, dt, i, s) {
-      const modeOpts = ['blocked','work','permissive'].map(m =>
-        `<option value="${m}"${m === s.mode ? ' selected' : ''}>${m}</option>`
-      ).join('');
-      return `<div class="form-row" id="slot-${key}-${dt}-${i}" style="align-items:center;margin-bottom:6px">
-        <input type="time" value="${s.start}" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:0.8rem" onchange="updateSlot('${key}','${dt}',${i},'start',this.value)">
-        <span style="color:#475569;font-size:0.8rem">→</span>
-        <input type="time" value="${s.end}" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:0.8rem" onchange="updateSlot('${key}','${dt}',${i},'end',this.value)">
-        <select style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:0.8rem" onchange="updateSlot('${key}','${dt}',${i},'mode',this.value)">${modeOpts}</select>
-        <button class="btn-danger" style="padding:3px 8px" onclick="removeSlot('${key}','${dt}',${i})">×</button>
-      </div>`;
-    }
+    // ── Actions sur les templates ────────────────────────────────────────
 
-    function updateSlot(key, dt, i, field, value) { profilesData[key].schedule[dt][i][field] = value; }
-
-    function addSlot(key, dt) {
-      const schedule = profilesData[key].schedule || {};
-      if (!schedule[dt]) schedule[dt] = [];
-      schedule[dt].push({ start: '08:00', end: '20:00', mode: 'permissive' });
-      profilesData[key].schedule = schedule;
-      _sortSchedule(key);
-      editingProfile = key;
+    function addTemplate(key) {
+      if (!_editingTemplates[key]) _editingTemplates[key] = [];
+      _editingTemplates[key].push({ start: '08:00', end: '20:00', mode: 'work', days: [true,true,true,true,true,false,false] });
       renderProfilesList();
     }
+    function removeTemplate(key, i) { _editingTemplates[key].splice(i, 1); renderProfilesList(); }
+    function updateTemplate(key, i, field, value) { _editingTemplates[key][i][field] = value; }
+    function toggleTemplateDay(key, i, di) { _editingTemplates[key][i].days[di] = !_editingTemplates[key][i].days[di]; renderProfilesList(); }
 
-    function removeSlot(key, dt, i) {
-      profilesData[key].schedule[dt].splice(i, 1);
-      renderProfilesList();
-    }
     function startEditProfile(key) {
       editingProfile = key;
       if (!profilesData[key].schedule) profilesData[key].schedule = Object.fromEntries(_DAY_KEYS.map(d => [d, []]));
-      _sortSchedule(key);
+      _editingTemplates[key] = scheduleToTemplates(profilesData[key].schedule);
       renderProfilesList();
     }
-    function cancelEditProfile() { editingProfile = null; loadProfiles(); }
+    function cancelEditProfile() {
+      if (editingProfile) delete _editingTemplates[editingProfile];
+      editingProfile = null;
+      loadProfiles();
+    }
 
     async function saveProfile(key) {
       const nameEl = document.getElementById(`ep-name-${key}`);
@@ -1072,13 +1117,14 @@
       const name = nameEl.value.trim();
       if (!name) { nameEl.style.borderColor = '#ef4444'; return; }
       const age = ageEl.value ? parseInt(ageEl.value) : null;
-      _sortSchedule(key);
+      const schedule = templatesToSchedule(_editingTemplates[key] || []);
       try {
         await fetch(`/api/profiles/${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, age, schedule: profilesData[key].schedule || {} })
+          body: JSON.stringify({ name, age, schedule })
         });
+        delete _editingTemplates[key];
         editingProfile = null;
         await loadProfiles();
       } catch(_) {}
