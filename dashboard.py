@@ -568,6 +568,7 @@ async def list_devices():
         for device in profile.get("devices", []):
             assigned[device["ip"]] = key
             assigned_mac[device["ip"]] = device.get("mac", "")
+    device_names: dict[str, str] = config.get("device_names", {})
 
     pihole_list = []
     bypass_list = []
@@ -588,6 +589,7 @@ async def list_devices():
             "ip":              ip,
             "mac":             mac,
             "hostname":        hostname,
+            "custom_name":     device_names.get(ip, ""),
             "via_pihole":      via_pihole,
             "last_seen":       last_seen,
             "assigned_profile": assigned.get(ip),
@@ -655,6 +657,37 @@ async def assign_device(body: DeviceAssign):
             pass
 
     m.notify()
+    return JSONResponse({"ok": True})
+
+
+class DeviceRename(BaseModel):
+    ip: str
+    name: str = ""
+
+
+@app.post("/api/devices/name")
+async def rename_device(body: DeviceRename):
+    try:
+        ipaddress.ip_address(body.ip)
+    except ValueError:
+        return JSONResponse({"ok": False, "error": "Adresse IP invalide"}, status_code=400)
+
+    name = body.name.strip()
+    config = _load_config()
+
+    if name:
+        config.setdefault("device_names", {})[body.ip] = name
+    else:
+        config.get("device_names", {}).pop(body.ip, None)
+
+    _save_config(config)
+
+    m = get_monitor()
+    try:
+        m.pihole.set_client_comment(body.ip, name or f"Protectado — {body.ip}")
+    except Exception as e:
+        print(f"[Dashboard] Avertissement rename Pi-hole : {e}")
+
     return JSONResponse({"ok": True})
 
 

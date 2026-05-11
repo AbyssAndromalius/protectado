@@ -149,10 +149,30 @@
     .device-table tr:hover td { background: #0f172a44; }
 
     .cell-ip { font-family: monospace; color: #93c5fd; font-size: 0.82rem; }
-    .cell-hostname { font-weight: 500; }
-    .cell-hostname.empty { color: #475569; font-style: italic; }
+    .cell-hostname { color: #64748b; font-size: 0.78rem; margin-top: 2px; }
+    .cell-hostname.empty { color: #334155; font-style: italic; }
     .cell-mac { font-family: monospace; color: #475569; font-size: 0.75rem; }
     .cell-time { color: #64748b; font-size: 0.8rem; }
+
+    .name-input {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #e2e8f0;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.855rem;
+      font-weight: 500;
+      width: 100%;
+      max-width: 180px;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .name-input::placeholder { color: #334155; font-weight: 400; font-style: italic; }
+    .name-input:hover { border-color: #334155; }
+    .name-input:focus { border-color: #3b82f6; background: #0f172a; }
+    .name-input.saving { border-color: #64748b; opacity: 0.7; }
+    .name-input.saved  { border-color: #4ade80; }
+    .name-input.error  { border-color: #f87171; }
 
     .profile-select {
       background: #0f172a;
@@ -230,7 +250,9 @@
     @media (max-width: 640px) {
       .page-header { flex-direction: column; align-items: flex-start; }
       .device-table th:nth-child(2),
-      .device-table td:nth-child(2) { display: none; }
+      .device-table td:nth-child(2),
+      .device-table th:nth-child(5),
+      .device-table td:nth-child(5) { display: none; }
     }
   </style>
 </head>
@@ -299,7 +321,7 @@
   const T = {{ t | tojson }};
   function tr(key) { return T[key] || key; }
 
-  // Pending changes: ip → {profile_key, mac}
+  // Pending profile changes: ip → {profile_key, mac}
   const pending = new Map();
 
   let allProfiles = [];
@@ -348,6 +370,7 @@
             <th>${tr('devices.col_ip')}</th>
             <th>${tr('devices.col_mac')}</th>
             <th>${tr('devices.col_device')}</th>
+            <th>${tr('devices.col_name')}</th>
             <th>${tr('devices.col_lastseen')}</th>
             <th>${tr('devices.col_profile')}</th>
           </tr>
@@ -359,9 +382,9 @@
   }
 
   function renderPiholeRow(d) {
-    const hostname = d.hostname
-      ? `<span class="cell-hostname">${esc(d.hostname)}</span>`
-      : `<span class="cell-hostname empty">${tr('devices.unknown_device')}</span>`;
+    const detectedLabel = d.hostname
+      ? `<div class="cell-hostname">${esc(d.hostname)}</div>`
+      : `<div class="cell-hostname empty">${tr('devices.unknown_device')}</div>`;
 
     const lastSeen = d.last_seen ? relativeTime(d.last_seen) : '—';
 
@@ -376,7 +399,19 @@
       <tr>
         <td><span class="cell-ip">${esc(d.ip)}</span></td>
         <td><span class="cell-mac">${esc(d.mac || '—')}</span></td>
-        <td>${hostname}</td>
+        <td>${detectedLabel}</td>
+        <td>
+          <input
+            class="name-input"
+            type="text"
+            value="${esc(d.custom_name || '')}"
+            placeholder="${esc(tr('devices.name_placeholder'))}"
+            data-ip="${esc(d.ip)}"
+            data-orig="${esc(d.custom_name || '')}"
+            onblur="saveName(this)"
+            onkeydown="if(event.key==='Enter'){this.blur()}"
+          >
+        </td>
         <td><span class="cell-time">${lastSeen}</span></td>
         <td>
           <select class="profile-select"
@@ -425,6 +460,46 @@
             </tr>`).join('')}
         </tbody>
       </table>`;
+  }
+
+  // ============================================================ //
+  //  Name inline save                                            //
+  // ============================================================ //
+  async function saveName(input) {
+    const ip   = input.dataset.ip;
+    const orig = input.dataset.orig;
+    const name = input.value.trim();
+
+    if (name === orig) return;
+
+    input.classList.add('saving');
+    input.disabled = true;
+
+    try {
+      const res = await fetch('/api/devices/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, name })
+      }).then(r => r.json());
+
+      if (res.ok) {
+        input.dataset.orig = name;
+        input.value = name;
+        input.classList.remove('saving');
+        input.classList.add('saved');
+        setTimeout(() => input.classList.remove('saved'), 1500);
+      } else {
+        input.classList.remove('saving');
+        input.classList.add('error');
+        setTimeout(() => { input.classList.remove('error'); input.value = orig; input.dataset.orig = orig; }, 2000);
+      }
+    } catch (_) {
+      input.classList.remove('saving');
+      input.classList.add('error');
+      setTimeout(() => { input.classList.remove('error'); input.value = orig; input.dataset.orig = orig; }, 2000);
+    } finally {
+      input.disabled = false;
+    }
   }
 
   // ============================================================ //

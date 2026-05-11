@@ -198,6 +198,11 @@ class PiHoleAPI:
                     })
         return devices
 
+    def set_client_comment(self, ip: str, comment: str) -> bool:
+        """Met à jour le nom/commentaire d'un client Pi-hole."""
+        data = self._put(f"/clients/{urlquote(ip, safe='')}", {"comment": comment})
+        return bool(data)
+
     def ensure_client_exists(self, ip: str, mac: str = "", hostname: str = "") -> bool:
         """Crée le client dans Pi-hole s'il n'existe pas encore (groupe par défaut)."""
         clients = self.get_clients()

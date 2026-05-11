@@ -155,6 +155,7 @@
   "devices.col_ip": "IP",
   "devices.col_mac": "MAC",
   "devices.col_device": "Dispositivo",
+  "devices.col_name": "Nome",
   "devices.col_lastseen": "Última atividade",
   "devices.col_note": "Nota",
   "devices.col_profile": "Perfil",
@@ -175,6 +176,9 @@
   "devices.time_just_now": "agora mesmo",
   "devices.time_min_ago": "min",
   "devices.time_h_ago": "h",
+  "devices.name_placeholder": "Dar nome a este dispositivo…",
+  "devices.name_saved": "Nome guardado",
+  "devices.name_error": "Erro ao guardar o nome",
 
   "profiles.title": "Perfis da família",
   "profiles.new_btn": "+ Novo perfil",
