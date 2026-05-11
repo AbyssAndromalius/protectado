@@ -315,6 +315,16 @@ async def last_report():
     return JSONResponse(dict(row) if row else {})
 
 
+def _resync_pihole_blacklists():
+    """Après classification, resync les blacklists Pi-hole pour tous les profils actifs."""
+    m = get_monitor()
+    for pname, profile in m.config["profiles"].items():
+        if profile.get("mode") == "monitoring" or not profile.get("devices"):
+            continue
+        slot = get_slot_at(pname, datetime.now())
+        m._apply_pihole_mode(pname, slot["mode"])
+
+
 @app.post("/api/report/generate")
 async def generate_report():
     import subprocess, sys
@@ -331,6 +341,7 @@ async def generate_report():
     try:
         result = await loop.run_in_executor(None, _run)
         if result.returncode == 0:
+            _resync_pihole_blacklists()
             return JSONResponse({"ok": True})
         return JSONResponse({"ok": False, "error": result.stderr[-500:]}, status_code=500)
     except subprocess.TimeoutExpired:
