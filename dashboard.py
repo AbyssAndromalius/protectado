@@ -420,7 +420,11 @@ async def chat(body: ChatMessage):
 @app.get("/api/stream")
 async def stream(request: Request):
     async def event_generator():
-        last_event_id = None
+        # Baseline = ID le plus récent au moment de la connexion.
+        # Seuls les événements postérieurs à la connexion seront poussés.
+        # Si la DB était vide, baseline = 0 → tout nouvel événement sera poussé.
+        init = db.get_recent_events(limit=1)
+        last_event_id = init[0]["id"] if init else 0
 
         while True:
             if await request.is_disconnected():
@@ -432,9 +436,7 @@ async def stream(request: Request):
                 events_list = db.get_recent_events(limit=50)
                 if events_list:
                     newest_id = events_list[0]["id"]
-                    if last_event_id is None:
-                        last_event_id = newest_id
-                    elif newest_id != last_event_id:
+                    if newest_id > last_event_id:
                         new = [e for e in events_list if e["id"] > last_event_id]
                         if new:
                             yield f"event: new_events\ndata: {json.dumps(new)}\n\n"
