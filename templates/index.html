@@ -137,6 +137,24 @@
     .chat-input-row button:hover { background: #2563eb; }
     .chat-input-row button:disabled { background: #334155; cursor: default; }
 
+    /* ---- AI offline state ---- */
+    .ai-off-badge {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 9999px;
+      background: #1e293b; color: #64748b; border: 1px solid #334155;
+      font-weight: 500;
+    }
+    .ai-disabled-area {
+      opacity: 0.45;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ai-notice {
+      font-size: 0.78rem; color: #64748b;
+      background: #0f172a; border: 1px solid #1e293b;
+      border-radius: 8px; padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+
     /* ---- Management tab forms ---- */
     .form-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
     .form-field { display: flex; flex-direction: column; gap: 4px; }
@@ -209,25 +227,29 @@
 
     <div class="card" style="margin-bottom:24px">
       <div class="card-header">
-        <span class="card-title">📋 {{ t['dashboard.report.title'] }}</span>
+        <span class="card-title">📋 {{ t['dashboard.report.title'] }} <span id="report-ai-badge" style="display:none" class="ai-off-badge">{{ t['dashboard.ai.off_badge'] }}</span></span>
         <div style="display:flex;align-items:center;gap:10px">
           <span id="report-date" style="color:#64748b;font-size:0.8rem"></span>
           <button id="report-generate-btn" class="btn-edit" style="font-size:0.75rem" onclick="generateReport()">{{ t['dashboard.report.generate_btn'] }}</button>
         </div>
       </div>
+      <div id="report-ai-notice" style="display:none" class="ai-notice">{{ t['dashboard.ai.no_key_report'] }}</div>
       <div id="report-content" style="color:#94a3b8;font-size:0.875rem;line-height:1.7;max-height:300px;overflow-y:auto">{{ t['dashboard.loading'] }}</div>
     </div>
 
     <div class="card" style="margin-bottom:24px">
       <div class="card-header">
-        <span class="card-title">💬 {{ t['dashboard.chat.title'] }}</span>
+        <span class="card-title">💬 {{ t['dashboard.chat.title'] }} <span id="chat-ai-badge" style="display:none" class="ai-off-badge">{{ t['dashboard.ai.off_badge'] }}</span></span>
       </div>
-      <div class="chat-messages" id="chat-messages">
-        <div class="msg msg-agent">{{ t['dashboard.chat.welcome'] }}</div>
-      </div>
-      <div class="chat-input-row">
-        <input type="text" id="chat-input" placeholder="{{ t['dashboard.chat.placeholder'] }}">
-        <button id="send-btn" onclick="sendChat()">{{ t['dashboard.chat.send'] }}</button>
+      <div id="chat-ai-notice" style="display:none" class="ai-notice">{{ t['dashboard.ai.no_key_chat'] }}</div>
+      <div id="chat-area">
+        <div class="chat-messages" id="chat-messages">
+          <div class="msg msg-agent">{{ t['dashboard.chat.welcome'] }}</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="{{ t['dashboard.chat.placeholder'] }}">
+          <button id="send-btn" onclick="sendChat()">{{ t['dashboard.chat.send'] }}</button>
+        </div>
       </div>
     </div>
 
@@ -627,6 +649,7 @@
     }
 
     async function sendChat() {
+      if (!aiAvailable) return;
       const input = document.getElementById("chat-input");
       const btn   = document.getElementById("send-btn");
       const msg   = input.value.trim();
@@ -1256,12 +1279,45 @@
     });
 
     // ================================================================ //
+    //  AI status                                                        //
+    // ================================================================ //
+
+    let aiAvailable = true;
+
+    function applyAiStatus(available) {
+      aiAvailable = available;
+      if (available) return;
+
+      // Rapport : badge + notice + bouton générer désactivé
+      document.getElementById('report-ai-badge').style.display = '';
+      document.getElementById('report-ai-notice').style.display = '';
+      const genBtn = document.getElementById('report-generate-btn');
+      genBtn.disabled = true;
+      genBtn.title = T['dashboard.ai.no_key_report'];
+
+      // Chat : badge + notice + zone saisie grisée
+      document.getElementById('chat-ai-badge').style.display = '';
+      document.getElementById('chat-ai-notice').style.display = '';
+      document.getElementById('chat-area').classList.add('ai-disabled-area');
+    }
+
+    async function checkAiStatus() {
+      try {
+        const data = await fetch('/api/ai/status').then(r => r.json());
+        applyAiStatus(data.available !== false);
+      } catch (_) {
+        // En cas d'erreur réseau, on ne désactive pas par défaut
+      }
+    }
+
+    // ================================================================ //
     //  Init                                                             //
     // ================================================================ //
 
     const _ovDate = document.getElementById("ov-date");
     if (_ovDate) _ovDate.value = new Date().toISOString().substring(0, 10);
 
+    checkAiStatus();
     loadStatus();
     loadReport();
     loadEvents();

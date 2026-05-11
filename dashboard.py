@@ -304,6 +304,15 @@ async def status():
     return JSONResponse(data)
 
 
+@app.get("/api/ai/status")
+async def ai_status():
+    config = _load_config()
+    key = config.get("openrouter", {}).get("api_key", "")
+    if not key:
+        return JSONResponse({"available": False, "reason": "not_configured"})
+    return JSONResponse({"available": True, "reason": "ok"})
+
+
 @app.get("/api/report")
 async def last_report():
     with db.get_db() as conn:

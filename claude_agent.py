@@ -578,7 +578,10 @@ def chat(user_message: str) -> str:
         return msg.content
 
     except Exception as e:
-        return f"Erreur : {e}"
+        msg = str(e)
+        if "openrouter" in msg.lower() or "api_key" in msg.lower() or isinstance(e, KeyError):
+            return "IA non configurée — ajoutez une clé OpenRouter dans les paramètres."
+        return f"IA indisponible : {e}"
 
 
 def daily_report() -> str:
