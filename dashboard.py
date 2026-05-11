@@ -930,8 +930,8 @@ class SetupSaveBody(BaseModel):
     subnet: str
     pihole_host: str
     pihole_password: str
-    openrouter_key: str
-    openrouter_model: str
+    openrouter_key: str = ""
+    openrouter_model: str = "anthropic/claude-sonnet-4-5"
     dashboard_password: str
     language: str = "fr"
     profiles: list[SetupProfile]
