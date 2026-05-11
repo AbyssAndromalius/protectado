@@ -136,6 +136,8 @@
   "manage.domains.col_domain": "Dominio",
   "manage.domains.col_category": "Categoría",
   "manage.domains.col_hits": "Visitas",
+  "manage.domains.col_blocked_work": "Bloqueado Trabajo",
+  "manage.domains.col_blocked_permissive": "Bloqueado Permisivo",
   "manage.domains.none": "Sin dominios",
   "manage.domains.all": "Todos",
   "manage.domains.edit_btn": "Editar",
