@@ -479,6 +479,10 @@
       if (tab === 'dashboard') { loadStatus(); loadEvents(); loadReport(); }
     }
 
+    // Variables d'état — déclarées ici pour être disponibles avant tout switchTab
+    let profilesData = {};
+    let editingProfile = null;
+
     // Ouvre l'onglet indiqué dans ?tab= (retour depuis /devices)
     const _tabParam = new URLSearchParams(location.search).get('tab');
     if (_tabParam && ['gestion','profils'].includes(_tabParam)) switchTab(_tabParam);
@@ -889,9 +893,6 @@
     // ================================================================ //
     //  Onglet Profils                                                   //
     // ================================================================ //
-
-    let profilesData = {};
-    let editingProfile = null;
 
     async function loadProfiles() {
       const container = document.getElementById('profiles-list-ui');
