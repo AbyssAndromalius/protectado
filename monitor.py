@@ -66,6 +66,7 @@ class ProtectadoMonitor:
         self._block_state: dict = {}   # (profile, domain) → état déduplication
         self._bypass_state: dict = {}  # (profile, ip) → datetime dernière alerte
         self._last_slot: dict = {}     # profile → dernier mode détecté
+        self._ip_has_dns_history: set = set()  # IPs ayant déjà fait des requêtes DNS
 
         db.init_db()
 
@@ -157,7 +158,9 @@ class ProtectadoMonitor:
         now = datetime.now()
         for device in profile.get("devices", []):
             ip = device["ip"]
-            if ip in active_ips and len(queries_by_ip.get(ip, [])) == 0:
+            if (ip in active_ips
+                    and ip in self._ip_has_dns_history
+                    and len(queries_by_ip.get(ip, [])) == 0):
                 key = (profile_key, ip)
                 last_warn = self._bypass_state.get(key)
                 if last_warn and (now - last_warn).total_seconds() < BLOCK_WINDOW_SEC:
@@ -311,6 +314,11 @@ class ProtectadoMonitor:
         queries   = self.pihole.get_recent_queries(minutes=5)
         by_ip     = self.pihole.queries_by_client(queries)
         active_ips = self.scanner.get_active_ips()
+
+        # Mettre à jour l'historique DNS : tout IP ayant des requêtes ce cycle est mémorisé
+        for ip, domains in by_ip.items():
+            if domains:
+                self._ip_has_dns_history.add(ip)
 
         for pname, profile in self.config["profiles"].items():
             # Ignorer si aucun appareil configuré
