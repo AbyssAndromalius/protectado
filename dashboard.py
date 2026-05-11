@@ -676,18 +676,26 @@ class TakeoverBody(BaseModel):
 
 
 def _make_basic_schedule(wake: str, bed: str) -> dict:
-    """Génère un planning blocked/work/permissive depuis heure de réveil et coucher."""
-    weekday = [
+    """Génère un planning par jour depuis heure de réveil et coucher."""
+    wd = [
         {"start": "00:00", "end": wake, "mode": "blocked"},
         {"start": wake,    "end": bed,  "mode": "work"},
         {"start": bed,     "end": "23:59", "mode": "blocked"},
     ]
-    weekend = [
+    we = [
         {"start": "00:00", "end": wake, "mode": "blocked"},
         {"start": wake,    "end": bed,  "mode": "permissive"},
         {"start": bed,     "end": "23:59", "mode": "blocked"},
     ]
-    return {"weekday": weekday, "weekend": weekend}
+    return {
+        "monday":    [dict(s) for s in wd],
+        "tuesday":   [dict(s) for s in wd],
+        "wednesday": [dict(s) for s in wd],
+        "thursday":  [dict(s) for s in wd],
+        "friday":    [dict(s) for s in wd],
+        "saturday":  [dict(s) for s in we],
+        "sunday":    [dict(s) for s in we],
+    }
 
 
 def _find_profile_for_ip(config: dict, ip: str) -> str | None:

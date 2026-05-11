@@ -16,6 +16,8 @@ MODE_LABELS = {
     "permissive": "🟢 Libre",
 }
 
+_DAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
 # Extensions de slot en mémoire (non persistées) — (minutes, date_iso)
 _slot_extensions: dict[str, tuple[int, str]] = {}
 
@@ -40,8 +42,13 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
         profile_data = {}
 
     is_weekend = now.weekday() >= 5
-    day_type = "weekend" if is_weekend else "weekday"
-    schedule_list = profile_data.get("schedule", {}).get(day_type, [])
+    day_key  = _DAY_KEYS[now.weekday()]
+    schedule = profile_data.get("schedule", {})
+    schedule_list = schedule.get(day_key, [])
+    # Rétrocompatibilité avec l'ancien format weekday/weekend
+    if not schedule_list:
+        legacy = "weekend" if is_weekend else "weekday"
+        schedule_list = schedule.get(legacy, [])
     current_time = now.time()
     ext_raw = _slot_extensions.get(profile, (0, ""))
     extra_min = ext_raw[0] if ext_raw[1] == now.date().isoformat() else 0
@@ -60,11 +67,9 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
                 "slot_start":          slot["start"],
                 "slot_end":            end.strftime("%H:%M"),
                 "next_change_minutes": _time_until(now, end),
-                "is_weekend":          is_weekend,
-                "day_type":            day_type,
+                "day":                 day_key,
             }
         if extra_min and start <= current_time:
-            # Slot dépassé — vérifier si on est dans la fenêtre d'extension
             end_dt = datetime.combine(now.date(), end) + timedelta(minutes=extra_min)
             if current_time <= end_dt.time():
                 ext_end = end_dt.time()
@@ -74,8 +79,7 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
                     "slot_start":          slot["start"],
                     "slot_end":            ext_end.strftime("%H:%M"),
                     "next_change_minutes": _time_until(now, ext_end),
-                    "is_weekend":          is_weekend,
-                    "day_type":            day_type,
+                    "day":                 day_key,
                 }
 
     return {
@@ -84,8 +88,7 @@ def get_current_slot(profile: str, now: datetime = None) -> dict:
         "slot_start":          "00:00",
         "slot_end":            "23:59",
         "next_change_minutes": 0,
-        "is_weekend":          is_weekend,
-        "day_type":            day_type,
+        "day":                 day_key,
     }
 
 

@@ -384,10 +384,14 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
 
         # Planning théorique du jour
         sample_dt = datetime.fromisoformat(f"{date}T12:00:00")
-        is_weekend = sample_dt.weekday() >= 5
-        day_type = "weekend" if is_weekend else "weekday"
+        _day_keys = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+        day_key  = _day_keys[sample_dt.weekday()]
         profile_data = config.get("profiles", {}).get(profile, {})
-        schedule_raw = profile_data.get("schedule", {}).get(day_type, [])
+        schedule = profile_data.get("schedule", {})
+        schedule_raw = schedule.get(day_key, [])
+        if not schedule_raw:  # rétrocompat weekday/weekend
+            legacy = "weekend" if sample_dt.weekday() >= 5 else "weekday"
+            schedule_raw = schedule.get(legacy, [])
         schedule = [
             {"slot_start": s["start"], "slot_end": s["end"], "mode": s["mode"]}
             for s in schedule_raw

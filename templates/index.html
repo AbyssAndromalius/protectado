@@ -910,12 +910,13 @@
 
     const _SLOT_COLOR = { blocked: '#f87171', work: '#60a5fa', permissive: '#c084fc' };
     const _SLOT_LABEL = { blocked: 'Bloqué', work: 'Travail', permissive: 'Permissif' };
+    const _DAY_KEYS   = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
     function renderSlotReadOnly(schedule) {
-      return ['weekday', 'weekend'].map(dt => {
+      return _DAY_KEYS.map(dt => {
         const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
         if (!slots.length) return '';
-        const label = dt === 'weekday' ? T['profiles.weekday'] : T['profiles.weekend'];
+        const label = T[`profiles.day.${dt}`] || dt;
         const chips = slots.map(s => {
           const col = _SLOT_COLOR[s.mode] || '#94a3b8';
           const lbl = _SLOT_LABEL[s.mode] || s.mode;
@@ -967,7 +968,7 @@
 
     function _sortSchedule(key) {
       const sched = profilesData[key].schedule || {};
-      for (const dt of ['weekday', 'weekend']) {
+      for (const dt of _DAY_KEYS) {
         if (sched[dt]) sched[dt].sort((a, b) => a.start.localeCompare(b.start));
       }
     }
@@ -986,12 +987,12 @@
               <input type="number" id="ep-age-${key}" value="${p.age || ''}" min="1" max="99" style="width:70px">
             </div>
           </div>
-          ${['weekday','weekend'].map(dt => {
+          ${_DAY_KEYS.map(dt => {
             const slots = [...(schedule[dt] || [])].sort((a, b) => a.start.localeCompare(b.start));
             return `
             <div style="margin-bottom:20px">
               <div style="font-size:0.8rem;font-weight:600;color:#94a3b8;margin-bottom:10px">
-                ${dt === 'weekday' ? T['profiles.weekday'] : T['profiles.weekend']}
+                ${T[`profiles.day.${dt}`] || dt}
               </div>
               <div id="slots-${key}-${dt}">
                 ${slots.map((s,i) => slotRow(key, dt, i, s)).join('')}
@@ -1034,7 +1035,7 @@
     }
     function startEditProfile(key) {
       editingProfile = key;
-      if (!profilesData[key].schedule) profilesData[key].schedule = { weekday: [], weekend: [] };
+      if (!profilesData[key].schedule) profilesData[key].schedule = Object.fromEntries(_DAY_KEYS.map(d => [d, []]));
       _sortSchedule(key);
       renderProfilesList();
     }
