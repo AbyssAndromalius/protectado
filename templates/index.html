@@ -899,8 +899,9 @@
       try {
         profilesData = await fetch('/api/profiles').then(r => r.json());
         renderProfilesList();
-      } catch(_) {
-        if (container) container.innerHTML = `<p style="color:#ef4444;font-size:0.875rem">Erreur de chargement</p>`;
+      } catch(err) {
+        console.error('[loadProfiles]', err);
+        if (container) container.innerHTML = `<p style="color:#ef4444;font-size:0.875rem">Erreur: ${err.message}</p>`;
       }
     }
 
