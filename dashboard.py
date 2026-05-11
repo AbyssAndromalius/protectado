@@ -28,6 +28,9 @@ templates = Jinja2Templates(directory="templates")
 
 monitor: ProtectadoMonitor | None = None
 
+_status_cache: dict = {}          # {"data": ..., "ts": datetime}
+_STATUS_CACHE_TTL = 8             # secondes — légèrement sous le refresh SSE (10s)
+
 # Sessions : token → expiry datetime (TTL 24h)
 _sessions: dict[str, datetime] = {}
 SESSION_TTL = timedelta(hours=24)
@@ -230,8 +233,8 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(request, "index.html", {"t": _load_translations(lang), "lang": lang})
 
 
-@app.get("/api/status")
-async def status():
+async def _build_status() -> dict:
+    """Construit les données de status en appelant Pi-hole."""
     loop = asyncio.get_event_loop()
     m = get_monitor()
     config = m.config
@@ -258,7 +261,6 @@ async def status():
         )
         yt_limit = None
 
-        # Override adulte actif sur l'un des appareils du profil ?
         takeover = None
         for ip in device_ips:
             ov = db.get_device_override(ip)
@@ -284,10 +286,22 @@ async def status():
             "takeover": takeover,
         }
 
-    return JSONResponse({
+    return {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "profiles": profiles_data
-    })
+        "profiles": profiles_data,
+    }
+
+
+@app.get("/api/status")
+async def status():
+    global _status_cache
+    now = datetime.now()
+    cached = _status_cache.get("data")
+    if cached and (now - _status_cache["ts"]).total_seconds() < _STATUS_CACHE_TTL:
+        return JSONResponse(cached)
+    data = await _build_status()
+    _status_cache = {"data": data, "ts": now}
+    return JSONResponse(data)
 
 
 @app.get("/api/report")

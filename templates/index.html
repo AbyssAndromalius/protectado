@@ -868,10 +868,14 @@
     let editingProfile = null;
 
     async function loadProfiles() {
+      const container = document.getElementById('profiles-list-ui');
+      if (container) container.innerHTML = `<p style="color:#475569;font-size:0.875rem">${T['dashboard.loading'] || 'Chargement...'}</p>`;
       try {
         profilesData = await fetch('/api/profiles').then(r => r.json());
         renderProfilesList();
-      } catch(_) {}
+      } catch(_) {
+        if (container) container.innerHTML = `<p style="color:#ef4444;font-size:0.875rem">Erreur de chargement</p>`;
+      }
     }
 
     function renderProfilesList() {
