@@ -316,13 +316,23 @@ async def last_report():
 
 
 def _resync_pihole_blacklists():
-    """Après classification, resync les blacklists Pi-hole pour tous les profils actifs."""
+    """Resync les blacklists Pi-hole pour work et permissive de tous les profils.
+    Appelé après génération du rapport — synce tous les groupes, pas seulement
+    le mode actuel, pour que les blacklists soient à jour même en mode blocked.
+    """
+    import domain_classifier as classifier
     m = get_monitor()
+    api = m.pihole
     for pname, profile in m.config["profiles"].items():
         if profile.get("mode") == "monitoring" or not profile.get("devices"):
             continue
-        slot = get_slot_at(pname, datetime.now())
-        m._apply_pihole_mode(pname, slot["mode"])
+        for mode in ("work", "permissive"):
+            group_name = f"{pname}-{mode}"
+            group_id = api.get_group_id(group_name)
+            if group_id is None:
+                continue
+            blacklist = classifier.get_active_blacklist(mode)
+            api._sync_blacklist(group_id, mode, blacklist)
 
 
 @app.post("/api/report/generate")
