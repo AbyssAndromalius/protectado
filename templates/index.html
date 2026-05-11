@@ -450,6 +450,7 @@
       });
       if (tab === 'gestion') loadManagementTab();
       if (tab === 'profils') loadProfiles();
+      if (tab === 'dashboard') { loadStatus(); loadEvents(); loadReport(); }
     }
 
     // Ouvre l'onglet indiqué dans ?tab= (retour depuis /devices)
