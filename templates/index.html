@@ -482,6 +482,11 @@
     // Variables d'état — déclarées ici pour être disponibles avant tout switchTab
     let profilesData = {};
     let editingProfile = null;
+    let scheduleData = {};
+    let domainsData  = [];
+    let activeMgmtFilter  = 'all';
+    let editingDomainIndex = null;
+    let _takeoverIps = [];
 
     // Ouvre l'onglet indiqué dans ?tab= (retour depuis /devices)
     const _tabParam = new URLSearchParams(location.search).get('tab');
@@ -647,12 +652,9 @@
     //  Onglet Gestion                                                   //
     // ================================================================ //
 
-    let scheduleData = {};
-    let domainsData  = [];
-    let activeMgmtFilter  = 'all';
-    let editingDomainIndex = null;
-
     async function loadManagementTab() {
+      const grid = document.getElementById("schedule-grid");
+      if (grid) grid.innerHTML = `<p style="color:#475569;font-size:0.8rem">Chargement...</p>`;
       await Promise.all([loadOverrides(), loadSchedule(), loadDomains()]);
     }
 
@@ -1093,8 +1095,6 @@
     // ================================================================ //
     //  Takeover                                                         //
     // ================================================================ //
-
-    let _takeoverIps = [];
 
     function openTakeoverModal(profileKey, deviceIps) {
       _takeoverIps = deviceIps;

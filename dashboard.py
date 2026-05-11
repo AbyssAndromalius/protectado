@@ -318,7 +318,9 @@ async def last_report():
 @app.get("/api/domains")
 async def domains():
     from domain_classifier import get_all_domains
-    return JSONResponse(get_all_domains())
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, get_all_domains)
+    return JSONResponse(data)
 
 
 @app.get("/api/events")
