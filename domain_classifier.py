@@ -380,20 +380,15 @@ def classify_with_cloudflare(limit: int = 200) -> int:
 #  Niveau 3 — Catégorisation Claude (1x/jour)                        #
 # ------------------------------------------------------------------ #
 
-def classify_with_claude(config: dict) -> dict:
+def classify_with_claude(config: dict, batch_size: int = 60) -> dict:
     """
     Demande à Claude de catégoriser les domaines inconnus.
-    Appelé une fois par jour depuis daily_report.py.
-    Retourne un dict {domain: category}.
+    Boucle jusqu'à épuisement (max 10 passes × batch_size domaines).
+    Appelé depuis daily_report.py et depuis /api/report/generate.
+    Retourne un dict {domain: category} de l'ensemble des passes.
     """
     # Niveau 2 : Cloudflare d'abord — réduit drastiquement la liste pour Claude
-    classify_with_cloudflare(limit=200)
-
-    # Tous les domaines encore inconnus (y compris ceux déjà essayés par Cloudflare)
-    uncategorized = get_uncategorized(limit=50, cloudflare_only=False)
-    if not uncategorized:
-        print("[Classifier] Aucun domaine à catégoriser par Claude.")
-        return {}
+    classify_with_cloudflare(limit=500)
 
     client = OpenAI(
         api_key=config["openrouter"]["api_key"],
@@ -402,9 +397,18 @@ def classify_with_claude(config: dict) -> dict:
                          "X-Title": "Protectado"}
     )
 
-    domains_list = [d["domain"] for d in uncategorized]
+    all_classifications: dict = {}
+    max_passes = 10
 
-    prompt = f"""Catégorise ces domaines DNS pour un contrôle parental.
+    for pass_num in range(1, max_passes + 1):
+        uncategorized = get_uncategorized(limit=batch_size, cloudflare_only=False)
+        if not uncategorized:
+            break
+
+        domains_list = [d["domain"] for d in uncategorized]
+        print(f"[Classifier] Passe {pass_num} — {len(domains_list)} domaines → Claude")
+
+        prompt = f"""Catégorise ces domaines DNS pour un contrôle parental.
 
 Catégories possibles :
 - education  : sites éducatifs, documentaires, apprentissage
@@ -423,33 +427,39 @@ Réponds UNIQUEMENT en JSON valide, format :
 
 Ne catégorise que si tu es sûr. Si incertain, mets "other"."""
 
-    try:
-        response = client.chat.completions.create(
-            model=config["openrouter"]["model"],
-            max_tokens=800,
-            messages=[
-                {"role": "system", "content": "Tu es un classificateur de domaines DNS. Réponds uniquement en JSON valide."},
-                {"role": "user", "content": prompt}
-            ]
-        )
+        try:
+            response = client.chat.completions.create(
+                model=config["openrouter"]["model"],
+                max_tokens=1200,
+                messages=[
+                    {"role": "system", "content": "Tu es un classificateur de domaines DNS. Réponds uniquement en JSON valide."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
 
-        raw = response.choices[0].message.content.strip()
-        # Nettoyer les backticks si présents
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        classifications = json.loads(raw)
+            raw = response.choices[0].message.content.strip()
+            raw = raw.replace("```json", "").replace("```", "").strip()
+            classifications = json.loads(raw)
 
-        # Appliquer en DB
-        for domain, category in classifications.items():
-            with db.get_db() as conn:
-                conn.execute("""
-                    UPDATE domains
-                    SET category=?, categorized_by='claude', categorized_at=?
-                    WHERE domain=? AND category='unknown'
-                """, (category, datetime.now().isoformat(), domain))
+            now = datetime.now().isoformat()
+            for domain, category in classifications.items():
+                with db.get_db() as conn:
+                    conn.execute("""
+                        UPDATE domains
+                        SET category=?, categorized_by='claude', categorized_at=?
+                        WHERE domain=? AND category='unknown'
+                    """, (category, now, domain))
 
-        print(f"[Classifier] {len(classifications)} domaines catégorisés par Claude")
-        return classifications
+            all_classifications.update(classifications)
+            print(f"[Classifier] Passe {pass_num} : {len(classifications)} domaines catégorisés")
 
-    except Exception as e:
-        print(f"[Classifier] Erreur classification : {e}")
-        return {}
+        except Exception as e:
+            print(f"[Classifier] Erreur passe {pass_num} : {e}")
+            break
+
+    if all_classifications:
+        print(f"[Classifier] Total : {len(all_classifications)} domaines catégorisés par Claude")
+    else:
+        print("[Classifier] Aucun domaine à catégoriser par Claude.")
+
+    return all_classifications

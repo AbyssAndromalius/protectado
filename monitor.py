@@ -67,6 +67,7 @@ class ProtectadoMonitor:
         self._bypass_state: dict = {}  # (profile, ip) → datetime dernière alerte
         self._last_slot: dict = {}     # profile → dernier mode détecté
         self._ip_has_dns_history: set = set()  # IPs ayant déjà fait des requêtes DNS
+        self._cloudflare_cycle: int = 0  # compteur pour classification périodique
 
         db.init_db()
 
@@ -309,8 +310,22 @@ class ProtectadoMonitor:
                              "Mode adulte terminé — retour profil enfant")
                 print(f"[Monitor] ⏱ Override expiré : {ip} → {profile_key}-{slot['mode']}")
 
+    def _maybe_classify_cloudflare(self):
+        """Classification Cloudflare toutes les 10 minutes (cycle 60s × 10 = 10 min)."""
+        self._cloudflare_cycle += 1
+        if self._cloudflare_cycle < 10:
+            return
+        self._cloudflare_cycle = 0
+        try:
+            n = classifier.classify_with_cloudflare(limit=100)
+            if n:
+                print(f"[Monitor] Cloudflare : {n} nouveaux domaines catégorisés")
+        except Exception as e:
+            print(f"[Monitor] Erreur classification Cloudflare : {e}")
+
     def run_cycle(self):
         self._check_expired_overrides()
+        self._maybe_classify_cloudflare()
         queries   = self.pihole.get_recent_queries(minutes=5)
         by_ip     = self.pihole.queries_by_client(queries)
         active_ips = self.scanner.get_active_ips()
