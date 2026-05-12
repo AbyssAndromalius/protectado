@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Arnaud Ortais
 # Dual-licensed: AGPL-3.0 (open source) or Commercial License — see LICENSE and LICENSE-COMMERCIAL.
-"""Lancé par cron à 23h — catégorise les domaines + génère le rapport."""
-import os, json
+"""Lancé par cron à 7h — catégorise les domaines + génère le rapport."""
+import os, json, sys
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 import domain_classifier as classifier
@@ -18,7 +18,7 @@ db.purge_old_timeline(days=7)
 with open(CONFIG_PATH) as f:
     config = json.load(f)
 
-# 2. Catégoriser les domaines inconnus (1 appel Claude)
+# 2. Catégoriser les domaines inconnus (Cloudflare + Claude)
 print("=== Catégorisation des domaines ===")
 results = classifier.classify_with_claude(config)
 for domain, cat in results.items():
@@ -28,3 +28,6 @@ for domain, cat in results.items():
 print("\n=== Rapport quotidien ===")
 report = claude_agent.daily_report()
 print(report)
+
+if report.startswith("Erreur"):
+    sys.exit(1)

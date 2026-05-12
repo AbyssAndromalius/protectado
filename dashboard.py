@@ -346,23 +346,24 @@ def _resync_pihole_blacklists():
 async def generate_report():
     import subprocess, sys
     base = os.path.dirname(DATA_DIR)
-    venv_python = os.path.join(base, "venv", "bin", "python3")
+    venv_python = os.path.join(base, ".venv", "bin", "python3")
     script = os.path.join(base, "daily_report.py")
     python = venv_python if os.path.exists(venv_python) else sys.executable
     loop = asyncio.get_event_loop()
     def _run():
         return subprocess.run(
             [python, script],
-            capture_output=True, text=True, timeout=120, cwd=base
+            capture_output=True, text=True, timeout=300, cwd=base
         )
     try:
         result = await loop.run_in_executor(None, _run)
         if result.returncode == 0:
             _resync_pihole_blacklists()
             return JSONResponse({"ok": True})
-        return JSONResponse({"ok": False, "error": result.stderr[-500:]}, status_code=500)
+        output = (result.stdout[-300:] + "\n" + result.stderr[-300:]).strip()
+        return JSONResponse({"ok": False, "error": output}, status_code=500)
     except subprocess.TimeoutExpired:
-        return JSONResponse({"ok": False, "error": "Timeout (120s)"}, status_code=500)
+        return JSONResponse({"ok": False, "error": "Timeout (300s)"}, status_code=500)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
