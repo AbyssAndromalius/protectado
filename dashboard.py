@@ -30,6 +30,7 @@ monitor: ProtectadoMonitor | None = None
 
 _status_cache: dict = {}          # {"data": ..., "ts": datetime}
 _STATUS_CACHE_TTL = 8             # secondes — légèrement sous le refresh SSE (10s)
+_ai_key_invalid: bool = False     # True si une 401 OpenRouter a été reçue depuis le dernier redémarrage
 
 # Sessions : token → expiry datetime (TTL 24h)
 _sessions: dict[str, datetime] = {}
@@ -306,9 +307,14 @@ async def status():
 
 @app.get("/api/ai/status")
 async def ai_status():
+    global _ai_key_invalid
     config = _load_config()
     key = config.get("openrouter", {}).get("api_key", "")
-    return JSONResponse({"available": bool(key), "reason": "ok" if key else "not_configured"})
+    if not key:
+        return JSONResponse({"available": False, "reason": "not_configured"})
+    if _ai_key_invalid:
+        return JSONResponse({"available": False, "reason": "invalid_key"})
+    return JSONResponse({"available": True, "reason": "ok"})
 
 
 @app.get("/api/report")
@@ -361,7 +367,11 @@ async def generate_report():
             _resync_pihole_blacklists()
             return JSONResponse({"ok": True})
         output = (result.stdout[-300:] + "\n" + result.stderr[-300:]).strip()
-        return JSONResponse({"ok": False, "error": output}, status_code=500)
+        ai_error = "401" in output or "User not found" in output or "invalid_api_key" in output
+        if ai_error:
+            global _ai_key_invalid
+            _ai_key_invalid = True
+        return JSONResponse({"ok": False, "error": output, "ai_key_invalid": ai_error}, status_code=500)
     except subprocess.TimeoutExpired:
         return JSONResponse({"ok": False, "error": "Timeout (300s)"}, status_code=500)
     except Exception as e:
@@ -482,20 +492,24 @@ class AiKeyUpdate(BaseModel):
 
 @app.post("/api/ai/key")
 async def update_ai_key(body: AiKeyUpdate):
+    global _ai_key_invalid
     key = body.key.strip()
     config = _load_config()
     config.setdefault("openrouter", {})["api_key"] = key
     _save_config(config)
+    _ai_key_invalid = False
     return JSONResponse({"ok": True})
 
 
 @app.post("/api/chat")
 async def chat(body: ChatMessage):
+    global _ai_key_invalid
     try:
         from openai import AuthenticationError as _OAIAuth
         reply = claude_agent.chat(body.message)
         return JSONResponse({"reply": reply})
     except _OAIAuth:
+        _ai_key_invalid = True
         return JSONResponse({"reply": "Clé API invalide ou révoquée.", "ai_available": False})
 
 

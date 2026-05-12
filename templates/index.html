@@ -627,6 +627,7 @@
           await loadReport();
         } else {
           content.textContent = 'Erreur : ' + (data.error || 'inconnue');
+          if (data.ai_key_invalid) applyAiStatus(false, T['dashboard.ai.no_key_report']);
         }
       } catch(e) {
         content.textContent = 'Erreur réseau';
