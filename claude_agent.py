@@ -506,7 +506,7 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
         result = {
             "profile": profile,
             "date": date,
-            "day_type": day_type,
+            "day_type": day_key,
             "override": override,
             "schedule": schedule,
             "domains": domain_summary,
