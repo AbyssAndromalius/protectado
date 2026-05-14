@@ -3,7 +3,7 @@ Description=Protectado — surveillance du déclencheur de mise à jour
 After=protectado-agent.service
 
 [Path]
-PathExists=/tmp/protectado-update.trigger
+PathExists=__WORKDIR__/data/update.trigger
 Unit=protectado-update.service
 
 [Install]

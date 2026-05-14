@@ -14,10 +14,17 @@ Coût : quelques centimes/jour maximum.
 
 import json
 import os
+import re
 import threading
 from datetime import datetime
 from openai import OpenAI, AuthenticationError as _AuthError
 from paths import CONFIG_PATH
+
+_DOMAIN_RE      = re.compile(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
+_PROFILE_KEY_RE = re.compile(r'^[a-z0-9_]{1,64}$')
+_VALID_MODES    = {"free", "work", "blocked", "normal"}
+_MAX_ALLOW_MIN  = 120
+_MAX_EXTEND_MIN = 60
 
 import database as db
 from monitor import notify_monitor, KEEPALIVE_MAX_HITS
@@ -110,9 +117,9 @@ PARENT_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "domain": {"type": "string"},
+                    "domain":  {"type": "string"},
                     "profile": {"type": "string"},
-                    "minutes": {"type": "integer"}
+                    "minutes": {"type": "integer", "minimum": 1, "maximum": 120}
                 },
                 "required": ["domain", "profile", "minutes"]
             }
@@ -127,7 +134,7 @@ PARENT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "profile": {"type": "string"},
-                    "minutes": {"type": "integer"}
+                    "minutes": {"type": "integer", "minimum": 1, "maximum": 60}
                 },
                 "required": ["profile", "minutes"]
             }
@@ -259,9 +266,22 @@ def _sync_pihole_blacklists(config: dict):
 def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
     """Exécute un outil parent et retourne un message de confirmation en français."""
 
+    def _check_profile(p: str) -> str | None:
+        if not _PROFILE_KEY_RE.match(p):
+            return f"Profil invalide : {p}"
+        if p not in config.get("profiles", {}):
+            return f"Profil inconnu : {p}"
+        return None
+
+    def _check_domain(d: str) -> str | None:
+        if not _DOMAIN_RE.match(d.lower()):
+            return f"Domaine invalide : {d}"
+        return None
+
     if name == "block_device_now":
         profile = args["profile"]
         reason  = args["reason"]
+        if err := _check_profile(profile): return err
         devices = config["profiles"].get(profile, {}).get("devices", [])
         if not devices:
             return f"Aucun appareil configuré pour le profil {profile}."
@@ -281,7 +301,11 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
     if name == "allow_domain_temporarily":
         domain  = args["domain"]
         profile = args["profile"]
-        minutes = args["minutes"]
+        minutes = int(args["minutes"])
+        if err := _check_domain(domain): return err
+        if err := _check_profile(profile): return err
+        if not (1 <= minutes <= _MAX_ALLOW_MIN):
+            return f"Durée invalide : {minutes} min (max {_MAX_ALLOW_MIN})"
         try:
             from pihole_api import PiHoleAPI
             from scheduler import get_slot_at
@@ -316,7 +340,10 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
 
     if name == "extend_access":
         profile = args["profile"]
-        minutes = args["minutes"]
+        minutes = int(args["minutes"])
+        if err := _check_profile(profile): return err
+        if not (1 <= minutes <= _MAX_EXTEND_MIN):
+            return f"Durée invalide : {minutes} min (max {_MAX_EXTEND_MIN})"
         from scheduler import extend_current_slot
         ok = extend_current_slot(profile, minutes)
         if ok:
@@ -329,6 +356,9 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
         date    = args["date"]
         mode    = args["mode"]
         reason  = args.get("reason", "")
+        if err := _check_profile(profile): return err
+        if mode not in _VALID_MODES:
+            return f"Mode invalide : {mode}"
         with db.get_db() as conn:
             conn.execute("""
                 INSERT INTO schedule_overrides (profile, date, mode, reason, created_at)
@@ -346,6 +376,7 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
     if name == "update_domain_category":
         domain   = args["domain"]
         category = args["category"]
+        if err := _check_domain(domain): return err
         import domain_classifier as dc
         dc.update_domain(domain, category=category, by="parent")
         _sync_pihole_blacklists(config)
@@ -355,6 +386,7 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
     if name == "add_to_blacklist":
         domain    = args["domain"]
         list_name = args["list"]
+        if err := _check_domain(domain): return err
         import domain_classifier as dc
         if list_name in ("work", "both"):
             dc.update_domain(domain, blocked_work=1, by="parent")

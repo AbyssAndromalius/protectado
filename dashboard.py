@@ -43,6 +43,7 @@ LOGIN_MAX_ATTEMPTS = 10   # max 10 tentatives par fenêtre
 
 SUPPORTED_LANGS = ["fr", "en", "es", "pt"]
 _PROFILE_KEY_RE = re.compile(r'^[a-z0-9_]{1,64}$')
+_DOMAIN_RE      = re.compile(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$')
 _VALID_OVERRIDE_MODES = {"blocked", "work", "permissive", "free", "normal"}
 _VALID_MODES = {"blocked", "work", "permissive"}
 _translations_cache: dict[str, dict] = {}
@@ -343,7 +344,9 @@ def _resync_pihole_blacklists():
 
 
 @app.post("/api/report/generate")
-async def generate_report():
+async def generate_report(request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
     import subprocess, sys
     base = os.path.dirname(DATA_DIR)
     venv_python = os.path.join(base, ".venv", "bin", "python3")
@@ -458,6 +461,8 @@ class DomainUpdate(BaseModel):
 
 @app.patch("/api/domains/{domain:path}")
 async def update_domain_route(domain: str, body: DomainUpdate):
+    if not _DOMAIN_RE.match(domain.lower()):
+        return JSONResponse({"ok": False, "error": "Domaine invalide"}, status_code=400)
     from domain_classifier import update_domain as _update
     from claude_agent import _sync_pihole_blacklists
     _update(
@@ -769,6 +774,8 @@ async def create_or_update_profile(key: str, body: ProfileUpdate):
 
 @app.delete("/api/profiles/{key}")
 async def delete_profile(key: str):
+    if not _PROFILE_KEY_RE.match(key):
+        return JSONResponse({"ok": False, "error": "Clé de profil invalide"}, status_code=400)
     config = _load_config()
     if key == "monitoring":
         return JSONResponse({"ok": False, "error": "Le profil monitoring ne peut pas être supprimé"}, status_code=400)
@@ -911,7 +918,7 @@ async def restore(request: Request, file: UploadFile = File(...)):
 # ------------------------------------------------------------------ #
 
 _UPDATE_LOG     = os.path.join(DATA_DIR, "update.log")
-_UPDATE_TRIGGER = "/tmp/protectado-update.trigger"
+_UPDATE_TRIGGER = os.path.join(DATA_DIR, "update.trigger")
 
 
 @app.post("/api/update")

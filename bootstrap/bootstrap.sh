@@ -387,8 +387,9 @@ step5_autoupdate() {
   sed "s|__WORKDIR__|$INSTALL_DIR|g" \
       "$INSTALL_DIR/protectado-update.service" \
       > /etc/systemd/system/protectado-update.service
-  cp "$INSTALL_DIR/protectado-update.path" \
-      /etc/systemd/system/protectado-update.path
+  sed "s|__WORKDIR__|$INSTALL_DIR|g" \
+      "$INSTALL_DIR/protectado-update.path" \
+      > /etc/systemd/system/protectado-update.path
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   systemctl enable --now protectado-update.path >> "$LOG_FILE" 2>&1
   ok "systemd path unit activé (protectado-update.path)"
