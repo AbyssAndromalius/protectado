@@ -910,7 +910,7 @@ async def restore(request: Request, file: UploadFile = File(...)):
 #  Mise à jour                                                        #
 # ------------------------------------------------------------------ #
 
-_UPDATE_LOG = "/tmp/protectado-update.log"
+_UPDATE_LOG = os.path.join(DATA_DIR, "update.log")
 _UPDATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap", "auto-update.sh")
 
 
