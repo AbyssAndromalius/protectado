@@ -38,8 +38,7 @@ _INFRA_DOMAINS  = frozenset({
 
 import database as db
 from monitor import notify_monitor, KEEPALIVE_MAX_HITS
-
-ACTION_QUEUE_DIR = "/tmp/fw-queue"
+from paths import ACTION_QUEUE_DIR
 
 _LANG_PROMPTS = {
     "fr": {

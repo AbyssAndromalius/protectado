@@ -27,7 +27,7 @@ import glob
 import logging
 from datetime import datetime
 
-from paths import CONFIG_PATH as _CONFIG_PATH
+from paths import CONFIG_PATH as _CONFIG_PATH, ACTION_QUEUE_DIR
 
 # Instance Pi-hole persistante — évite de recréer une session à chaque action
 _pihole_api = None
@@ -41,7 +41,6 @@ def get_pihole_api():
         _pihole_api = PiHoleAPI(config["pihole"]["host"], config["pihole"]["password"])
     return _pihole_api
 
-ACTION_QUEUE_DIR = "/tmp/fw-queue"
 LOG_FILE = "/var/log/protectado-runner.log"
 POLL_INTERVAL = 2        # secondes
 ACTION_MAX_AGE = 300     # rejeter les actions > 5 min (évite replay d'actions figées)

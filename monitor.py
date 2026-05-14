@@ -22,14 +22,12 @@ import os
 from collections import deque
 from datetime import datetime
 
-from paths import CONFIG_PATH
+from paths import CONFIG_PATH, ACTION_QUEUE_DIR
 from pihole_api import PiHoleAPI
 from scheduler import get_slot_at
 import domain_classifier as classifier
 from arp_scanner import ARPScanner
 import database as db
-
-ACTION_QUEUE_DIR = "/tmp/fw-queue"
 
 # Seuil pour considérer un volume de requêtes comme "inhabituel"
 UNUSUAL_QUERY_THRESHOLD = 50  # requêtes vers un domaine inconnu en 5 min

@@ -513,7 +513,7 @@ PYEOF
   rm -rf /etc/protectado
   rm -rf "$INSTALL_DIR"
   rm -f /var/log/protectado-*.log /var/log/fw-*.log
-  rm -f /tmp/fw-queue/arp_scan.json
+  rm -rf /tmp/fw-queue
 
   echo ""
   echo "  ✓ Installation et configuration Pi-hole supprimées."

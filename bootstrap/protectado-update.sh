@@ -44,8 +44,8 @@ fi
 
 log "INFO  Mise à jour disponible : ${LOCAL:0:8} → ${REMOTE:0:8}"
 
-# Sauvegarde
-BACKUP="/tmp/protectado-bk-$(date +%s)"
+# Sauvegarde dans /opt/ (persistant, survit à un reboot contrairement à /tmp/)
+BACKUP="/opt/protectado-bk-$(date +%s)"
 mkdir -p "$BACKUP"
 [ -f data/config.json ]    && cp data/config.json    "$BACKUP/"
 [ -f data/protectado.db ]  && cp data/protectado.db  "$BACKUP/"
@@ -93,6 +93,7 @@ import database; database.init_db()
     systemctl restart protectado-runner protectado-agent 2>&1
     sleep 3
     if systemctl is-active --quiet protectado-agent; then
+        rm -rf "$BACKUP"
         log "INFO  Rollback réussi — retour à ${LOCAL:0:8}"
     else
         log "CRIT  Rollback échoué — intervention manuelle requise"
@@ -101,4 +102,5 @@ import database; database.init_db()
     exit 1
 fi
 
+rm -rf "$BACKUP"
 log "OK    Mise à jour terminée — version ${REMOTE:0:8}"
