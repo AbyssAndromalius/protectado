@@ -926,8 +926,12 @@ async def trigger_update(request: Request):
     if not _check_session(request):
         return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
     try:
-        # Écrire le fichier déclencheur — le systemd path unit démarre
-        # protectado-update.service en root sans passer par sudo
+        # Vider le log avant de déclencher — garantit que le dashboard
+        # n'affiche que la session en cours dès le premier poll
+        try:
+            open(_UPDATE_LOG, "w").close()
+        except Exception:
+            pass
         open(_UPDATE_TRIGGER, "w").close()
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
@@ -940,13 +944,7 @@ async def update_log(request: Request):
         return JSONResponse({"ok": False}, status_code=401)
     try:
         with open(_UPDATE_LOG) as f:
-            content = f.read()
-        # Retourner uniquement la dernière session (depuis le dernier marqueur de début)
-        idx = content.rfind("Vérification des mises à jour")
-        if idx > 0:
-            sol = content.rfind("\n", 0, idx)
-            content = content[sol + 1 if sol >= 0 else idx:]
-        return Response(content, media_type="text/plain")
+            return Response(f.read(), media_type="text/plain")
     except FileNotFoundError:
         return Response("", media_type="text/plain")
 
