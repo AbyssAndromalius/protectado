@@ -167,6 +167,8 @@ async def auth_middleware(request: Request, call_next):
     if path == "/login":
         return await call_next(request)
     if not _check_session(request):
+        if path.startswith("/api/"):
+            return JSONResponse({"ok": False, "error": "session_expired"}, status_code=401)
         return RedirectResponse(url="/login", status_code=302)
     return await call_next(request)
 
