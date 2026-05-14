@@ -85,7 +85,7 @@ run_update() {
   fi
 
   # Restaurer config.json (jamais écrasé par git)
-  [ -f "$BACKUP_DIR/config.json" ] && cp "$BACKUP_DIR/config.json" "$INSTALL_DIR/config.json"
+  [ -f "$BACKUP_DIR/config.json" ] && cp "$BACKUP_DIR/config.json" "$INSTALL_DIR/data/config.json"
 
   # Dépendances Python
   log "   Mise à jour des dépendances Python..."
