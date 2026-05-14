@@ -919,14 +919,18 @@ async def trigger_update(request: Request):
     if not _check_session(request):
         return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
     if not os.path.exists(_UPDATE_SCRIPT):
-        return JSONResponse({"ok": False, "error": "Script introuvable"}, status_code=404)
-    with open(_UPDATE_LOG, "w") as log:
+        return JSONResponse({"ok": False, "error": f"Script introuvable : {_UPDATE_SCRIPT}"}, status_code=404)
+    try:
+        log_fh = open(_UPDATE_LOG, "w")
         subprocess.Popen(
             ["bash", _UPDATE_SCRIPT],
-            stdout=log,
+            stdout=log_fh,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+        log_fh.close()
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     return JSONResponse({"ok": True})
 
 
