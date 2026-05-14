@@ -6,5 +6,5 @@ After=network-online.target
 Type=oneshot
 ExecStart=/usr/local/sbin/protectado-update
 ExecStartPost=/bin/rm -f __WORKDIR__/data/update.trigger
-StandardOutput=append:__WORKDIR__/data/update.log
-StandardError=append:__WORKDIR__/data/update.log
+StandardOutput=file:__WORKDIR__/data/update.log
+StandardError=file:__WORKDIR__/data/update.log

@@ -97,6 +97,11 @@ run_update() {
   .venv/bin/python -c "import database; database.init_db()" 2>&1 | tee -a "$LOG_FILE"
   ok "Migration base de données"
 
+  # Rétablir les permissions — git/pip en root créent des objets root-owned,
+  # ce qui bloque les mises à jour suivantes via le script systemd (qui tourne en SVC_USER)
+  chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
+  ok "Permissions rétablies ($REAL_USER)"
+
   # Régénérer les services systemd et le profil nono (applique les changements du repo)
   log "   Mise à jour des services systemd et profil nono..."
   NONO_BIN=$(command -v nono 2>/dev/null || echo "nono")
