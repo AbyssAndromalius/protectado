@@ -923,7 +923,7 @@ async def trigger_update(request: Request):
     try:
         log_fh = open(_UPDATE_LOG, "w")
         subprocess.Popen(
-            ["bash", _UPDATE_SCRIPT],
+            ["sudo", _UPDATE_SCRIPT],
             stdout=log_fh,
             stderr=subprocess.STDOUT,
             start_new_session=True,
