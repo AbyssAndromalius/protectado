@@ -116,14 +116,6 @@ run_update() {
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   ok "Services systemd et profil nono mis à jour"
 
-  # Sudoers initial si absent (transition vers le script sécurisé)
-  if [ ! -f /etc/sudoers.d/protectado-update ]; then
-    printf '%s ALL=(root) NOPASSWD: %s/bootstrap/auto-update.sh\n' \
-        "$REAL_USER" "$INSTALL_DIR" > /etc/sudoers.d/protectado-update
-    chmod 440 /etc/sudoers.d/protectado-update
-    ok "Sudoers initial configuré"
-  fi
-
   # Mise à jour du cron
   step5_autoupdate
 
@@ -359,13 +351,6 @@ step4_services() {
       > /etc/protectado/agent.json
   chmod 644 /etc/protectado/agent.json
 
-  # Sudoers initial : permet au service user de déclencher auto-update.sh
-  # Remplacé par le sudoers sécurisé dans step5_autoupdate
-  printf '%s ALL=(root) NOPASSWD: %s/bootstrap/auto-update.sh\n' \
-      "$REAL_USER" "$INSTALL_DIR" > /etc/sudoers.d/protectado-update
-  chmod 440 /etc/sudoers.d/protectado-update
-  ok "Sudoers initial configuré"
-
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   systemctl enable protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
   systemctl start protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
@@ -394,14 +379,19 @@ step5_autoupdate() {
   chmod 755 /usr/local/sbin/protectado-update
   ok "Script de mise à jour → /usr/local/sbin/protectado-update (root:root)"
 
-  # Autoriser le service user à déclencher la mise à jour via sudo
-  # Portée stricte : uniquement ce binaire, pas de wildcard
-  cat > /etc/sudoers.d/protectado-update <<SUDOEOF
-# Protectado — déclenche la mise à jour depuis le dashboard
-$REAL_USER ALL=(root) NOPASSWD: /usr/local/sbin/protectado-update
-SUDOEOF
-  chmod 440 /etc/sudoers.d/protectado-update
-  ok "sudoers → $REAL_USER peut lancer /usr/local/sbin/protectado-update"
+  # Supprimer le sudoers si présent (plus nécessaire avec le path unit)
+  rm -f /etc/sudoers.d/protectado-update
+  ok "sudoers supprimé (remplacé par systemd path unit)"
+
+  # Installer le path unit et le service unit (déclenchement sans sudo)
+  sed "s|__WORKDIR__|$INSTALL_DIR|g" \
+      "$INSTALL_DIR/protectado-update.service" \
+      > /etc/systemd/system/protectado-update.service
+  cp "$INSTALL_DIR/protectado-update.path" \
+      /etc/systemd/system/protectado-update.path
+  systemctl daemon-reload >> "$LOG_FILE" 2>&1
+  systemctl enable --now protectado-update.path >> "$LOG_FILE" 2>&1
+  ok "systemd path unit activé (protectado-update.path)"
 
   cat > /etc/cron.d/protectado <<EOF
 # Protectado — auto-update chaque nuit à 3h00

@@ -910,27 +910,18 @@ async def restore(request: Request, file: UploadFile = File(...)):
 #  Mise à jour                                                        #
 # ------------------------------------------------------------------ #
 
-_UPDATE_LOG = os.path.join(DATA_DIR, "update.log")
-_UPDATE_SCRIPT = "/usr/local/sbin/protectado-update"
-_UPDATE_FALLBACK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap", "auto-update.sh")
+_UPDATE_LOG     = os.path.join(DATA_DIR, "update.log")
+_UPDATE_TRIGGER = "/tmp/protectado-update.trigger"
 
 
 @app.post("/api/update")
 async def trigger_update(request: Request):
     if not _check_session(request):
         return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
-    script = _UPDATE_SCRIPT if os.path.exists(_UPDATE_SCRIPT) else _UPDATE_FALLBACK
-    if not os.path.exists(script):
-        return JSONResponse({"ok": False, "error": "Script de mise à jour introuvable"}, status_code=404)
     try:
-        log_fh = open(_UPDATE_LOG, "w")
-        subprocess.Popen(
-            ["sudo", script],
-            stdout=log_fh,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        log_fh.close()
+        # Écrire le fichier déclencheur — le systemd path unit démarre
+        # protectado-update.service en root sans passer par sudo
+        open(_UPDATE_TRIGGER, "w").close()
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     return JSONResponse({"ok": True})

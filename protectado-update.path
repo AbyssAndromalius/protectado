@@ -1,0 +1,10 @@
+[Unit]
+Description=Protectado — surveillance du déclencheur de mise à jour
+After=protectado-agent.service
+
+[Path]
+PathExists=/tmp/protectado-update.trigger
+Unit=protectado-update.service
+
+[Install]
+WantedBy=multi-user.target

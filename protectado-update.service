@@ -1,0 +1,10 @@
+[Unit]
+Description=Protectado — mise à jour depuis git
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/protectado-update
+ExecStartPost=/bin/rm -f /tmp/protectado-update.trigger
+StandardOutput=append:__WORKDIR__/data/update.log
+StandardError=append:__WORKDIR__/data/update.log
