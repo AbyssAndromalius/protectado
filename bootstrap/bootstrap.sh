@@ -370,11 +370,27 @@ step4_services() {
 step5_autoupdate() {
   step 5 "Mises à jour automatiques"
 
-  chmod +x "$INSTALL_DIR/bootstrap/auto-update.sh"
+  # Installer le script de mise à jour sécurisé dans /usr/local/sbin/
+  # root:root 755 — hors de portée du service user
+  sed "s|__USER__|$REAL_USER|g" \
+      "$INSTALL_DIR/bootstrap/protectado-update.sh" \
+      > /usr/local/sbin/protectado-update
+  chown root:root /usr/local/sbin/protectado-update
+  chmod 755 /usr/local/sbin/protectado-update
+  ok "Script de mise à jour → /usr/local/sbin/protectado-update (root:root)"
+
+  # Autoriser le service user à déclencher la mise à jour via sudo
+  # Portée stricte : uniquement ce binaire, pas de wildcard
+  cat > /etc/sudoers.d/protectado-update <<SUDOEOF
+# Protectado — déclenche la mise à jour depuis le dashboard
+$REAL_USER ALL=(root) NOPASSWD: /usr/local/sbin/protectado-update
+SUDOEOF
+  chmod 440 /etc/sudoers.d/protectado-update
+  ok "sudoers → $REAL_USER peut lancer /usr/local/sbin/protectado-update"
 
   cat > /etc/cron.d/protectado <<EOF
 # Protectado — auto-update chaque nuit à 3h00
-0 3 * * * root $INSTALL_DIR/bootstrap/auto-update.sh >> /var/log/fw-update.log 2>&1
+0 3 * * * root /usr/local/sbin/protectado-update >> /var/log/fw-update.log 2>&1
 
 # Pi-hole — mise à jour chaque dimanche à 4h00
 0 4 * * 0 root pihole -up >> /var/log/fw-update.log 2>&1
@@ -383,7 +399,7 @@ step5_autoupdate() {
 0 7 * * * $REAL_USER $INSTALL_DIR/.venv/bin/python $INSTALL_DIR/daily_report.py >> /var/log/protectado-report.log 2>&1
 
 # Nettoyage timeline DNS (conservation 7 jours) — chaque dimanche à 2h00
-0 2 * * 0 root $INSTALL_DIR/.venv/bin/python -c "import sys; sys.path.insert(0,'$INSTALL_DIR'); import database; database.purge_old_timeline()" >> /var/log/protectado-report.log 2>&1
+0 2 * * 0 $REAL_USER $INSTALL_DIR/.venv/bin/python -c "import sys; sys.path.insert(0,'$INSTALL_DIR'); import database; database.purge_old_timeline()" >> /var/log/protectado-report.log 2>&1
 
 EOF
   chmod 644 /etc/cron.d/protectado

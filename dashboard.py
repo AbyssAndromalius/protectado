@@ -911,7 +911,7 @@ async def restore(request: Request, file: UploadFile = File(...)):
 # ------------------------------------------------------------------ #
 
 _UPDATE_LOG = os.path.join(DATA_DIR, "update.log")
-_UPDATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap", "auto-update.sh")
+_UPDATE_SCRIPT = "/usr/local/sbin/protectado-update"
 
 
 @app.post("/api/update")
