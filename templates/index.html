@@ -258,6 +258,7 @@
         <div class="chat-input-row">
           <input type="text" id="chat-input" placeholder="{{ t['dashboard.chat.placeholder'] }}">
           <button id="send-btn" onclick="sendChat()">{{ t['dashboard.chat.send'] }}</button>
+          <button onclick="resetChat()" title="{{ t['dashboard.chat.reset'] }}" style="background:#334155;padding:10px 12px">↺</button>
         </div>
       </div>
     </div>
@@ -712,6 +713,12 @@
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
       return div;
+    }
+
+    async function resetChat() {
+      await fetch("/api/chat/reset", { method: "POST" });
+      const container = document.getElementById("chat-messages");
+      container.innerHTML = `<div class="msg msg-agent">${T['dashboard.chat.welcome']}</div>`;
     }
 
     document.getElementById("chat-input").addEventListener("keydown", e => {

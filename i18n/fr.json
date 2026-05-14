@@ -101,6 +101,7 @@
   "dashboard.chat.welcome": "Bonjour ! Je surveille le réseau en temps réel. Posez-moi une question sur l'activité d'un enfant.",
   "dashboard.chat.placeholder": "Ex : Que fait [prénom] depuis ce matin ?",
   "dashboard.chat.send": "Envoyer",
+  "dashboard.chat.reset": "Nouvelle conversation",
   "dashboard.chat.conn_error": "Erreur de connexion.",
   "dashboard.events.title": "Événements récents",
   "dashboard.events.none": "Aucun événement",

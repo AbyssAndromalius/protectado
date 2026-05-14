@@ -101,6 +101,7 @@
   "dashboard.chat.welcome": "Olá! Estou a monitorizar a rede em tempo real. Faça-me uma pergunta sobre a atividade de uma criança.",
   "dashboard.chat.placeholder": "Ex: O que fez [nome] desde esta manhã?",
   "dashboard.chat.send": "Enviar",
+  "dashboard.chat.reset": "Nova conversa",
   "dashboard.chat.conn_error": "Erro de ligação.",
   "dashboard.events.title": "Eventos recentes",
   "dashboard.events.none": "Sem eventos",

@@ -512,6 +512,14 @@ async def chat(body: ChatMessage):
         return JSONResponse({"reply": "Clé API invalide ou révoquée.", "ai_available": False})
 
 
+@app.post("/api/chat/reset")
+async def chat_reset(request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False}, status_code=401)
+    claude_agent.reset_chat_history()
+    return JSONResponse({"ok": True})
+
+
 # ------------------------------------------------------------------ #
 #  SSE                                                                #
 # ------------------------------------------------------------------ #
