@@ -67,7 +67,16 @@ import database; database.init_db()
 " 2>&1
 log "INFO  Migration DB OK"
 
-# Seule opération nécessitant root
+# Mettre à jour les fichiers systemd depuis le repo (applique les changements de templates)
+for unit in protectado-update.service protectado-update.path; do
+    if [ -f "$INSTALL_DIR/$unit" ]; then
+        sed "s|__WORKDIR__|$INSTALL_DIR|g" "$INSTALL_DIR/$unit" \
+            > "/etc/systemd/system/$unit"
+    fi
+done
+systemctl daemon-reload 2>&1
+
+# Seules opérations nécessitant root
 systemctl restart protectado-runner protectado-agent 2>&1
 sleep 5
 
