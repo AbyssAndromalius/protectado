@@ -912,18 +912,20 @@ async def restore(request: Request, file: UploadFile = File(...)):
 
 _UPDATE_LOG = os.path.join(DATA_DIR, "update.log")
 _UPDATE_SCRIPT = "/usr/local/sbin/protectado-update"
+_UPDATE_FALLBACK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap", "auto-update.sh")
 
 
 @app.post("/api/update")
 async def trigger_update(request: Request):
     if not _check_session(request):
         return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
-    if not os.path.exists(_UPDATE_SCRIPT):
-        return JSONResponse({"ok": False, "error": f"Script introuvable : {_UPDATE_SCRIPT}"}, status_code=404)
+    script = _UPDATE_SCRIPT if os.path.exists(_UPDATE_SCRIPT) else _UPDATE_FALLBACK
+    if not os.path.exists(script):
+        return JSONResponse({"ok": False, "error": "Script de mise à jour introuvable"}, status_code=404)
     try:
         log_fh = open(_UPDATE_LOG, "w")
         subprocess.Popen(
-            ["sudo", _UPDATE_SCRIPT],
+            ["sudo", script],
             stdout=log_fh,
             stderr=subprocess.STDOUT,
             start_new_session=True,

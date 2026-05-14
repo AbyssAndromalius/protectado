@@ -116,6 +116,14 @@ run_update() {
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   ok "Services systemd et profil nono mis à jour"
 
+  # Sudoers initial si absent (transition vers le script sécurisé)
+  if [ ! -f /etc/sudoers.d/protectado-update ]; then
+    printf '%s ALL=(root) NOPASSWD: %s/bootstrap/auto-update.sh\n' \
+        "$REAL_USER" "$INSTALL_DIR" > /etc/sudoers.d/protectado-update
+    chmod 440 /etc/sudoers.d/protectado-update
+    ok "Sudoers initial configuré"
+  fi
+
   # Mise à jour du cron
   step5_autoupdate
 
@@ -350,6 +358,13 @@ step4_services() {
       "$INSTALL_DIR/protectado-agent.json" \
       > /etc/protectado/agent.json
   chmod 644 /etc/protectado/agent.json
+
+  # Sudoers initial : permet au service user de déclencher auto-update.sh
+  # Remplacé par le sudoers sécurisé dans step5_autoupdate
+  printf '%s ALL=(root) NOPASSWD: %s/bootstrap/auto-update.sh\n' \
+      "$REAL_USER" "$INSTALL_DIR" > /etc/sudoers.d/protectado-update
+  chmod 440 /etc/sudoers.d/protectado-update
+  ok "Sudoers initial configuré"
 
   systemctl daemon-reload >> "$LOG_FILE" 2>&1
   systemctl enable protectado-runner protectado-agent >> "$LOG_FILE" 2>&1
