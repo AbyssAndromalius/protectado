@@ -64,9 +64,7 @@ class ProtectadoMonitor:
         self._wakeup = threading.Event()
         self._unusual_events = []  # buffer avant escalade vers Claude
         self._block_state: dict = {}   # (profile, domain) → état déduplication
-        self._bypass_state: dict = {}  # (profile, ip) → datetime dernière alerte
         self._last_slot: dict = {}     # profile → dernier mode détecté
-        self._ip_has_dns_history: set = set()  # IPs ayant déjà fait des requêtes DNS
         self._cloudflare_cycle: int = 0  # compteur pour classification périodique
 
         db.init_db()
@@ -147,31 +145,6 @@ class ProtectadoMonitor:
             "device_ips": device_ips,
             "blacklist": blacklist
         })
-
-    def _check_bypass_dns(self, profile_key: str, profile: dict,
-                          active_ips: set, queries_by_ip: dict):
-        """Détecte un appareil actif sans requêtes DNS."""
-        # En mode blocked, Pi-hole bloque tout le DNS → zéro requête est normal
-        current_mode = get_slot_at(profile_key, datetime.now())["mode"]
-        if current_mode == "blocked":
-            return
-
-        now = datetime.now()
-        for device in profile.get("devices", []):
-            ip = device["ip"]
-            if (ip in active_ips
-                    and ip in self._ip_has_dns_history
-                    and len(queries_by_ip.get(ip, [])) == 0):
-                key = (profile_key, ip)
-                last_warn = self._bypass_state.get(key)
-                if last_warn and (now - last_warn).total_seconds() < BLOCK_WINDOW_SEC:
-                    continue
-                self._bypass_state[key] = now
-                label = device.get("name") or device.get("mac") or ip
-                msg = (f"Bypass DNS suspecté sur {label} ({ip}) "
-                       f"— appareil actif sans requêtes DNS")
-                db.log_event(profile_key, "warning", ip, msg)
-                print(f"[Monitor] ⚠ {msg}")
 
     def _check_blocked_domains(self, profile_key: str, profile: dict,
                                 queries_by_ip: dict):
@@ -330,11 +303,6 @@ class ProtectadoMonitor:
         by_ip     = self.pihole.queries_by_client(queries)
         active_ips = self.scanner.get_active_ips()
 
-        # Mettre à jour l'historique DNS : tout IP ayant des requêtes ce cycle est mémorisé
-        for ip, domains in by_ip.items():
-            if domains:
-                self._ip_has_dns_history.add(ip)
-
         for pname, profile in self.config["profiles"].items():
             # Ignorer si aucun appareil configuré
             if not profile.get("devices"):
@@ -350,7 +318,6 @@ class ProtectadoMonitor:
 
             # Règles déterministes — aucun appel IA
             self._check_schedule(pname, profile, active_ips)
-            self._check_bypass_dns(pname, profile, active_ips, by_ip)
             self._check_blocked_domains(pname, profile, by_ip)
             self._check_unusual_patterns(pname, profile, by_ip)
 

@@ -176,6 +176,16 @@ def get_time_spent_today(profile: str) -> dict:
     }
 
 
+def get_last_dns(profile: str) -> datetime | None:
+    """Retourne le timestamp de la dernière requête DNS enregistrée pour un profil."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT timestamp FROM dns_timeline WHERE profile=? ORDER BY timestamp DESC LIMIT 1",
+            (profile,)
+        ).fetchone()
+    return datetime.fromisoformat(row["timestamp"]) if row else None
+
+
 def get_usage_today(profile: str) -> dict:
     today = date.today().isoformat()
     with get_db() as conn:

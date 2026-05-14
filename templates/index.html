@@ -99,7 +99,6 @@
     .stat-row:last-child { border-bottom: none; }
     .stat-label { color: #94a3b8; }
     .stat-value { font-weight: 500; }
-    .bypass-alert { background: #451a03; border: 1px solid #92400e; border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; color: #fcd34d; margin-top: 12px; }
     .takeover-badge { background: #431407; border: 1px solid #c2410c; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; color: #fb923c; margin-top: 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .btn-takeover { background:#1d4ed8; color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:0.75rem; cursor:pointer; }
     .btn-release  { background:#374151; color:#d1d5db; border:none; border-radius:6px; padding:5px 12px; font-size:0.75rem; cursor:pointer; }
@@ -364,6 +363,19 @@
       </div>
     </div>
 
+    <!-- Mise à jour -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <span class="card-title">🔄 {{ t['manage.update.title'] }}</span>
+      </div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:8px 0">
+        <p style="color:#94a3b8;font-size:0.8rem;margin:0;flex:1">{{ t['manage.update.desc'] }}</p>
+        <button class="btn-primary" id="btn-update" onclick="triggerUpdate()">{{ t['manage.update.btn'] }}</button>
+      </div>
+      <div id="update-status" style="display:none;margin-top:12px;font-size:0.8rem;color:#fcd34d"></div>
+      <pre id="update-log" style="display:none;margin-top:10px;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;font-size:0.72rem;color:#94a3b8;max-height:200px;overflow-y:auto;white-space:pre-wrap"></pre>
+    </div>
+
     <!-- Sauvegarde & Restauration -->
     <div class="card">
       <div class="card-header">
@@ -549,18 +561,18 @@
       for (const [key, p] of Object.entries(profiles)) {
         const meta = PROFILES_META[key] || { emoji: "👤" };
         const isActive = p.active_devices && p.active_devices.length > 0;
-        const dotClass = p.bypass_suspected ? "warning" : isActive ? "online" : "offline";
-        const dotTitle = p.bypass_suspected ? T['dashboard.profile.bypass_title'] : isActive ? T['dashboard.profile.online'] : T['dashboard.profile.offline'];
+        const dotClass = isActive ? "online" : "offline";
+        const dotTitle = isActive ? T['dashboard.profile.online'] : T['dashboard.profile.offline'];
 
-        const ytMin = p.youtube_minutes_today || 0;
-        const ytLimit = p.youtube_limit_minutes;
-        let ytBadge = "";
-        if (ytLimit) {
-          const pct = Math.round((ytMin / ytLimit) * 100);
-          const cls = pct >= 100 ? "badge-red" : pct >= 70 ? "badge-yellow" : "badge-green";
-          ytBadge = `<span class="badge ${cls}">${ytMin}min / ${ytLimit}min</span>`;
-        } else if (ytMin > 0) {
-          ytBadge = `<span class="badge badge-yellow">${tr('dashboard.profile.yt_min', {min: ytMin})}</span>`;
+        let lastSeenBadge = "—";
+        if (p.last_seen_hours !== null && p.last_seen_hours !== undefined) {
+          const h = p.last_seen_hours;
+          const cls = h < 48 ? "badge-green" : h < 120 ? "badge-yellow" : "badge-red";
+          let label;
+          if (h < 1) label = T['dashboard.profile.last_seen_now'];
+          else if (h < 24) label = tr('dashboard.profile.last_seen_hours', {h: Math.round(h)});
+          else label = tr('dashboard.profile.last_seen_days', {d: Math.round(h / 24)});
+          lastSeenBadge = `<span class="badge ${cls}">${label}</span>`;
         }
 
         grid.innerHTML += `
@@ -578,15 +590,13 @@
               <span class="stat-value">${isActive ? p.active_devices.join(", ") : "—"}</span>
             </div>
             <div class="stat-row">
-              <span class="stat-label">${T['dashboard.profile.youtube_today']}</span>
-              <span class="stat-value">${ytBadge || "—"}</span>
+              <span class="stat-label">${T['dashboard.profile.last_seen']}</span>
+              <span class="stat-value">${lastSeenBadge}</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">${T['dashboard.profile.dns_queries']}</span>
               <span class="stat-value">${p.dns_queries_last_5min || 0}</span>
             </div>
-            ${p.bypass_suspected ? `
-              <div class="bypass-alert">${T['dashboard.profile.bypass_warning']}</div>` : ""}
             ${p.device_ips && p.device_ips.length > 0 ? (
               p.takeover ? `
               <div class="takeover-badge">
@@ -1238,6 +1248,56 @@
         status.style.color = '#f87171';
       }
       fileInput.value = '';
+    }
+
+    // ================================================================ //
+    //  Mise à jour                                                      //
+    // ================================================================ //
+
+    async function triggerUpdate() {
+      const btn = document.getElementById('btn-update');
+      const statusEl = document.getElementById('update-status');
+      const logEl = document.getElementById('update-log');
+      btn.disabled = true;
+      statusEl.style.display = 'block';
+      logEl.style.display = 'none';
+      logEl.textContent = '';
+      try {
+        const r = await fetch('/api/update', { method: 'POST' });
+        const j = await r.json();
+        if (!j.ok) {
+          statusEl.textContent = '✗ ' + (j.error || T['manage.update.error']);
+          statusEl.style.color = '#f87171';
+          btn.disabled = false;
+          return;
+        }
+      } catch (_) {
+        statusEl.textContent = '✗ ' + T['manage.update.error'];
+        statusEl.style.color = '#f87171';
+        btn.disabled = false;
+        return;
+      }
+
+      // Polling du log + countdown avant rechargement
+      let seconds = 50;
+      logEl.style.display = 'block';
+      const poll = setInterval(async () => {
+        try {
+          const text = await fetch('/api/update/log').then(r => r.text());
+          if (text) { logEl.textContent = text; logEl.scrollTop = logEl.scrollHeight; }
+        } catch (_) {}
+      }, 3000);
+
+      const tick = setInterval(() => {
+        seconds--;
+        statusEl.textContent = tr('manage.update.started', { s: seconds });
+        statusEl.style.color = '#fcd34d';
+        if (seconds <= 0) {
+          clearInterval(tick);
+          clearInterval(poll);
+          location.reload();
+        }
+      }, 1000);
     }
 
     // ================================================================ //

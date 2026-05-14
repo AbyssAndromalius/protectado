@@ -253,14 +253,11 @@ async def _build_status() -> dict:
         for ip in device_ips:
             dns_queries.extend(by_ip.get(ip, []))
 
-        bypass = any(ip in active_ips for ip in device_ips) and \
-                 len(dns_queries) == 0 and len(device_ips) > 0
-
-        yt_minutes = (
-            db.estimate_session_minutes(pname, "youtube.com") +
-            db.estimate_session_minutes(pname, "youtu.be")
+        last_dns = db.get_last_dns(pname)
+        last_seen_hours = (
+            round((datetime.now() - last_dns).total_seconds() / 3600, 1)
+            if last_dns else None
         )
-        yt_limit = None
 
         takeover = None
         for ip in device_ips:
@@ -279,10 +276,7 @@ async def _build_status() -> dict:
             "active_devices": [ip for ip in device_ips if ip in active_ips],
             "device_ips": device_ips,
             "dns_queries_last_5min": len(dns_queries),
-            "bypass_suspected": bypass,
-            "youtube_minutes_today": yt_minutes,
-            "youtube_limit_minutes": yt_limit,
-            "youtube_quota_exceeded": yt_limit and yt_minutes >= yt_limit,
+            "last_seen_hours": last_seen_hours,
             "is_bedtime": get_slot_at(pname, datetime.now())["mode"] == "blocked",
             "takeover": takeover,
         }
@@ -910,6 +904,41 @@ async def restore(request: Request, file: UploadFile = File(...)):
     if monitor:
         monitor.reload_config()
     return JSONResponse({"ok": True})
+
+
+# ------------------------------------------------------------------ #
+#  Mise à jour                                                        #
+# ------------------------------------------------------------------ #
+
+_UPDATE_LOG = "/tmp/protectado-update.log"
+_UPDATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bootstrap", "auto-update.sh")
+
+
+@app.post("/api/update")
+async def trigger_update(request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False, "error": "Non authentifié"}, status_code=401)
+    if not os.path.exists(_UPDATE_SCRIPT):
+        return JSONResponse({"ok": False, "error": "Script introuvable"}, status_code=404)
+    with open(_UPDATE_LOG, "w") as log:
+        subprocess.Popen(
+            ["bash", _UPDATE_SCRIPT],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/update/log")
+async def update_log(request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False}, status_code=401)
+    try:
+        with open(_UPDATE_LOG) as f:
+            return Response(f.read(), media_type="text/plain")
+    except FileNotFoundError:
+        return Response("", media_type="text/plain")
 
 
 # ------------------------------------------------------------------ #
