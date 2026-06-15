@@ -15,6 +15,11 @@ def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript("""
+            CREATE TABLE IF NOT EXISTS acknowledged_reports (
+                event_id    INTEGER PRIMARY KEY,
+                acked_at    TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS events (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT    NOT NULL,
@@ -197,11 +202,36 @@ def get_usage_today(profile: str) -> dict:
 
 
 def get_recent_events(limit: int = 50) -> list:
+    _REPORT_TYPES = ('daily_report', 'weekly_report', 'monthly_report')
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM events ORDER BY timestamp DESC LIMIT ?", (limit,)
+            "SELECT * FROM events WHERE type NOT IN (?,?,?) ORDER BY timestamp DESC LIMIT ?",
+            (*_REPORT_TYPES, limit)
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_pending_reports() -> list[dict]:
+    """Rapports non encore acquittés (daily, weekly, monthly)."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT e.id, e.timestamp, e.type, e.message
+            FROM events e
+            LEFT JOIN acknowledged_reports a ON a.event_id = e.id
+            WHERE e.profile = 'global'
+              AND e.type IN ('daily_report', 'weekly_report', 'monthly_report')
+              AND a.event_id IS NULL
+            ORDER BY e.timestamp DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def acknowledge_report(event_id: int):
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO acknowledged_reports (event_id, acked_at) VALUES (?,?)",
+            (event_id, datetime.now().isoformat())
+        )
 
 
 def get_events_for_profile(profile: str, limit: int = 20) -> list:
@@ -300,6 +330,30 @@ def get_override_for_date(profile: str, date: str) -> dict | None:
             (profile, date)
         ).fetchone()
     return dict(row) if row else None
+
+
+def get_usage_range(profile: str, days: int) -> list[dict]:
+    """Usage DNS par domaine pour les N derniers jours."""
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT date, domain, queries FROM daily_usage
+            WHERE profile=? AND date >= ?
+            ORDER BY date ASC, queries DESC
+        """, (profile, cutoff)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_events_range(profile: str, days: int) -> list[dict]:
+    """Événements pour les N derniers jours."""
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT timestamp, type, domain, message FROM events
+            WHERE profile=? AND timestamp >= ?
+            ORDER BY timestamp ASC
+        """, (profile, cutoff)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def init_domains_table(conn=None):

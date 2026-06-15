@@ -314,6 +314,19 @@ async def ai_status():
     return JSONResponse({"available": True, "reason": "ok"})
 
 
+@app.get("/api/reports/pending")
+async def pending_reports():
+    return JSONResponse(db.get_pending_reports())
+
+
+@app.post("/api/reports/{report_id}/acknowledge")
+async def acknowledge_report(report_id: int, request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False}, status_code=401)
+    db.acknowledge_report(report_id)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/api/report")
 async def last_report():
     with db.get_db() as conn:

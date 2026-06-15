@@ -672,6 +672,140 @@ def reset_chat_history() -> None:
     _chat_history = []
 
 
+def weekly_report() -> str:
+    """Revue hebdomadaire des tendances — appelée chaque lundi."""
+    from datetime import date, timedelta
+    config = _load_config()
+    client, model = _get_client(config)
+
+    today = date.today()
+    period = f"{(today - timedelta(days=7)).isoformat()} → {today.isoformat()}"
+
+    # Rapports quotidiens de la semaine (analyses déjà produites)
+    cutoff = (today - timedelta(days=7)).isoformat()
+    with db.get_db() as conn:
+        rows = conn.execute("""
+            SELECT timestamp, message FROM events
+            WHERE profile='global' AND type='daily_report' AND timestamp >= ?
+            ORDER BY timestamp ASC
+        """, (cutoff,)).fetchall()
+    daily_analyses = [{"date": r["timestamp"][:10], "rapport": r["message"]} for r in rows]
+
+    # Données brutes en complément (top domaines sur la semaine)
+    profiles_data = {}
+    for pname, profile in config["profiles"].items():
+        if profile.get("mode") == "monitoring" or not profile.get("devices"):
+            continue
+        rows_usage = db.get_usage_range(pname, 7)
+        totals: dict[str, int] = {}
+        for row in rows_usage:
+            totals[row["domain"]] = totals.get(row["domain"], 0) + row["queries"]
+        top = sorted(totals.items(), key=lambda x: -x[1])[:15]
+        profiles_data[pname] = {
+            "name": profile["name"],
+            "top_domaines": [{"domain": d, "requetes": q} for d, q in top],
+        }
+
+    prompt = (
+        f"Tu disposes des {len(daily_analyses)} rapports quotidiens de la semaine ({period}) "
+        "que tu as toi-même produits, ainsi que des données brutes d'usage DNS.\n"
+        "Génère une revue hebdomadaire de tendances : domaines en hausse ou baisse, "
+        "différences semaine/week-end, alertes récurrentes, points d'attention pour les parents.\n"
+        "Sois concis (8-10 lignes max par enfant).\n\n"
+        f"Rapports quotidiens :\n```json\n{json.dumps(daily_analyses, indent=2, ensure_ascii=False)}\n```\n\n"
+        f"Top domaines (données brutes) :\n```json\n{json.dumps(profiles_data, indent=2, ensure_ascii=False)}\n```"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=800,
+            messages=[
+                {"role": "system", "content": _build_system_prompt()},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        report = response.choices[0].message.content
+        db.log_event("global", "info", "",          f"Revue hebdomadaire : {report[:300]}")
+        db.log_event("global", "weekly_report", "", report)
+        return report
+    except Exception as e:
+        return f"Erreur revue hebdomadaire : {e}"
+
+
+def monthly_report() -> str:
+    """Revue mensuelle des tendances — appelée le 1er de chaque mois."""
+    from datetime import date, timedelta
+    config = _load_config()
+    client, model = _get_client(config)
+
+    today = date.today()
+    period = f"{(today - timedelta(days=30)).isoformat()} → {today.isoformat()}"
+
+    # Revues hebdomadaires du mois (analyses déjà produites)
+    cutoff = (today - timedelta(days=30)).isoformat()
+    with db.get_db() as conn:
+        rows = conn.execute("""
+            SELECT timestamp, message FROM events
+            WHERE profile='global' AND type='weekly_report' AND timestamp >= ?
+            ORDER BY timestamp ASC
+        """, (cutoff,)).fetchall()
+    weekly_analyses = [{"semaine_du": r["timestamp"][:10], "revue": r["message"]} for r in rows]
+
+    # Données brutes en complément (tendance 1ère vs 2ème quinzaine)
+    profiles_data = {}
+    for pname, profile in config["profiles"].items():
+        if profile.get("mode") == "monitoring" or not profile.get("devices"):
+            continue
+        rows_usage = db.get_usage_range(pname, 30)
+        totals: dict[str, int] = {}
+        first_half: dict[str, int] = {}
+        second_half: dict[str, int] = {}
+        for row in rows_usage:
+            dom, q = row["domain"], row["queries"]
+            totals[dom] = totals.get(dom, 0) + q
+            age = (today - date.fromisoformat(row["date"])).days
+            target = first_half if age > 15 else second_half
+            target[dom] = target.get(dom, 0) + q
+        top = sorted(totals.items(), key=lambda x: -x[1])[:20]
+        trending_up = [
+            d for d in second_half
+            if second_half[d] >= 2 * first_half.get(d, 1) and second_half[d] > 10
+        ][:10]
+        profiles_data[pname] = {
+            "name": profile["name"],
+            "top_domaines": [{"domain": d, "requetes_totales": q} for d, q in top],
+            "domaines_en_hausse_2eme_quinzaine": trending_up,
+        }
+
+    prompt = (
+        f"Tu disposes des {len(weekly_analyses)} revues hebdomadaires du mois ({period}) "
+        "que tu as toi-même produites, ainsi que des données brutes d'usage DNS.\n"
+        "Génère une revue mensuelle : tendances qui se confirment semaine après semaine, "
+        "domaines en hausse notable sur la 2ème quinzaine, habitudes qui se cristallisent, "
+        "points d'attention durables pour les parents.\n"
+        "Sois synthétique (10-12 lignes max par enfant).\n\n"
+        f"Revues hebdomadaires :\n```json\n{json.dumps(weekly_analyses, indent=2, ensure_ascii=False)}\n```\n\n"
+        f"Données brutes :\n```json\n{json.dumps(profiles_data, indent=2, ensure_ascii=False)}\n```"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=1000,
+            messages=[
+                {"role": "system", "content": _build_system_prompt()},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        report = response.choices[0].message.content
+        db.log_event("global", "info", "",           f"Revue mensuelle : {report[:300]}")
+        db.log_event("global", "monthly_report", "", report)
+        return report
+    except Exception as e:
+        return f"Erreur revue mensuelle : {e}"
+
+
 def daily_report() -> str:
     """
     Rapport quotidien — 1 appel/jour, planifié à 23h.
@@ -718,7 +852,8 @@ def daily_report() -> str:
             ]
         )
         summary = summary_response.choices[0].message.content
-        db.log_event("global", "info", "", f"Rapport quotidien : {summary}")
+        db.log_event("global", "info", "",    f"Rapport quotidien : {summary}")
+        db.log_event("global", "daily_report", "", report)
         return report
 
     except Exception as e:

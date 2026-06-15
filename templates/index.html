@@ -193,6 +193,23 @@
     /* ---- Domain filters ---- */
     .domain-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 
+    /* ---- Rapports ---- */
+    .report-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .report-card.fading { opacity: 0; transform: translateX(24px); pointer-events: none; }
+    .report-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+    .report-card-title { font-weight: 600; font-size: 0.95rem; }
+    .report-card-date { color: #64748b; font-size: 0.8rem; font-weight: 400; }
+    .report-card-body { color: #94a3b8; font-size: 0.875rem; line-height: 1.7; max-height: 220px; overflow-y: auto; }
+    .btn-ack { background: #052e16; color: #4ade80; border: 1px solid #14532d; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+    .btn-ack:hover { background: #14532d; }
+
     @media (max-width: 640px) {
       .grid { grid-template-columns: 1fr; }
       .form-row { flex-direction: column; }
@@ -221,6 +238,11 @@
   <!-- Tab 1 : Dashboard                                                 -->
   <!-- ================================================================ -->
   <div class="tab-content" id="tab-dashboard">
+
+    <!-- Rapports non lus -->
+    <div id="reports-section" style="display:none;margin-bottom:24px">
+      <div id="reports-list"></div>
+    </div>
 
     <div class="grid" id="profiles-grid"></div>
 
@@ -524,7 +546,7 @@
       });
       if (tab === 'gestion') loadManagementTab();
       if (tab === 'profils') loadProfiles();
-      if (tab === 'dashboard') { loadStatus(); loadEvents(); loadReport(); }
+      if (tab === 'dashboard') { loadStatus(); loadEvents(); loadReport(); loadPendingReports(); }
     }
 
     // Variables d'état — déclarées ici pour être disponibles avant tout switchTab
@@ -610,6 +632,47 @@
             ) : ""}
           </div>`;
       }
+    }
+
+    const _REPORT_META = {
+      daily_report:   { label: 'Rapport quotidien',  icon: '📋', color: '#3b82f6' },
+      weekly_report:  { label: 'Revue hebdomadaire', icon: '📈', color: '#8b5cf6' },
+      monthly_report: { label: 'Revue mensuelle',    icon: '📅', color: '#f59e0b' },
+    };
+
+    async function loadPendingReports() {
+      const section = document.getElementById('reports-section');
+      const list    = document.getElementById('reports-list');
+      try {
+        const reports = await fetch('/api/reports/pending').then(r => r.json());
+        if (!Array.isArray(reports) || !reports.length) { section.style.display = 'none'; return; }
+        section.style.display = '';
+        list.innerHTML = reports.map(r => {
+          const m    = _REPORT_META[r.type] || { label: r.type, icon: '📄', color: '#64748b' };
+          const date = r.timestamp.substring(0, 10);
+          return `<div class="report-card" id="report-card-${r.id}" style="border-left:4px solid ${m.color}">
+            <div class="report-card-header">
+              <span class="report-card-title">${m.icon} ${m.label} <span class="report-card-date">— ${date}</span></span>
+              <button class="btn-ack" onclick="acknowledgeReport(${r.id})">Lu ✓</button>
+            </div>
+            <div class="report-card-body">${renderMarkdown(r.message)}</div>
+          </div>`;
+        }).join('');
+      } catch(_) {
+        section.style.display = 'none';
+      }
+    }
+
+    async function acknowledgeReport(id) {
+      const card = document.getElementById(`report-card-${id}`);
+      if (!card) return;
+      card.classList.add('fading');
+      await fetch(`/api/reports/${id}/acknowledge`, { method: 'POST' });
+      setTimeout(() => {
+        card.remove();
+        if (!document.querySelectorAll('.report-card').length)
+          document.getElementById('reports-section').style.display = 'none';
+      }, 300);
     }
 
     async function loadReport() {
@@ -1437,6 +1500,7 @@
     loadStatus();
     loadReport();
     loadEvents();
+    loadPendingReports();
   </script>
 
 

@@ -414,6 +414,8 @@ step5_autoupdate() {
 
 EOF
   chmod 644 /etc/cron.d/protectado
+  touch /var/log/protectado-report.log
+  chown "$REAL_USER" /var/log/protectado-report.log
   ok "Crons configurés"
 }
 
