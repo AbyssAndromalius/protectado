@@ -34,7 +34,7 @@ _ai_key_invalid: bool = False     # True si une 401 OpenRouter a été reçue de
 
 # Sessions : token → expiry datetime (TTL 24h)
 _sessions: dict[str, datetime] = {}
-SESSION_TTL = timedelta(hours=24)
+SESSION_TTL = timedelta(minutes=30)
 
 # Rate-limiting login : ip → liste de timestamps de tentatives
 _login_attempts: dict[str, list[float]] = {}
@@ -95,6 +95,7 @@ def _check_session(request: Request) -> bool:
     if datetime.now() > _sessions[token]:
         del _sessions[token]
         return False
+    _sessions[token] = datetime.now() + SESSION_TTL  # fenêtre glissante
     return True
 
 
