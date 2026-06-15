@@ -21,6 +21,29 @@ _DAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 # Extensions de slot en mémoire (non persistées) — (minutes, date_iso)
 _slot_extensions: dict[str, tuple[int, str]] = {}
 
+# Overrides temporaires de mode — (mode, expires_at)
+_temp_overrides: dict[str, tuple[str, datetime]] = {}
+
+
+def set_temp_override(profile: str, mode: str, minutes: int) -> None:
+    _temp_overrides[profile] = (mode, datetime.now() + timedelta(minutes=minutes))
+
+
+def clear_temp_override(profile: str) -> None:
+    _temp_overrides.pop(profile, None)
+
+
+def get_temp_override(profile: str) -> str | None:
+    """Retourne le mode temporaire actif, ou None si absent/expiré."""
+    entry = _temp_overrides.get(profile)
+    if entry is None:
+        return None
+    mode, expires_at = entry
+    if datetime.now() >= expires_at:
+        _temp_overrides.pop(profile, None)
+        return None
+    return mode
+
 
 def _load_config() -> dict:
     with open(CONFIG_PATH) as f:
@@ -101,6 +124,15 @@ def extend_current_slot(profile: str, minutes: int) -> bool:
 
 
 def get_slot_at(profile: str, dt: datetime) -> dict:
+    temp_mode = get_temp_override(profile)
+    if temp_mode:
+        return {
+            "mode":            temp_mode,
+            "slot_start":      "00:00",
+            "slot_end":        "23:59",
+            "override":        True,
+            "override_reason": "override_temporaire",
+        }
     import database as db
     date_str = dt.strftime("%Y-%m-%d")
     override = db.get_override_for_date(profile, date_str)

@@ -95,21 +95,8 @@ class ProtectadoMonitor:
         if is_monitoring:
             return
 
-        # Vérifier si un override existe pour aujourd'hui
-        today = datetime.now().strftime("%Y-%m-%d")
-        with db.get_db() as conn:
-            override = conn.execute(
-                "SELECT mode FROM schedule_overrides WHERE profile=? AND date=?",
-                (profile_key, today)
-            ).fetchone()
-
-        if override and override["mode"] != "normal":
-            raw_mode = override["mode"]
-            mode = "permissive" if raw_mode == "free" else raw_mode
-            slot = {"slot_start": "00:00", "slot_end": "23:59", "mode": mode}
-        else:
-            slot = get_slot_at(profile_key, datetime.now())
-            mode = slot["mode"]
+        slot = get_slot_at(profile_key, datetime.now())
+        mode = slot["mode"]
 
         # Détecter un changement de slot
         prev_mode = self._last_slot.get(profile_key)

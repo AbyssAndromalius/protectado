@@ -27,8 +27,9 @@ _PROFILE_KEY_RE = re.compile(r'^[a-z0-9_]{1,64}$')
 _chat_history: list[dict] = []
 _CHAT_HISTORY_MAX_TURNS = 10  # nb max d'échanges conservés (user + assistant = 1 tour)
 _VALID_MODES    = {"free", "work", "blocked", "normal"}
-_MAX_ALLOW_MIN  = 120
-_MAX_EXTEND_MIN = 60
+_MAX_ALLOW_MIN        = 120
+_MAX_EXTEND_MIN       = 60
+_MAX_MODE_OVERRIDE_MIN = 240
 # Domaines d'infrastructure jamais blacklistables par l'agent
 _INFRA_DOMAINS  = frozenset({
     "pi.hole", "pihole.local", "local", "lan",
@@ -211,6 +212,36 @@ PARENT_TOOLS = [
                     "list": {"type": "string", "enum": ["work", "permissive", "both"]}
                 },
                 "required": ["domain", "list"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "allow_mode_for",
+            "description": (
+                "Applique immédiatement un mode d'accès pour un profil pendant N minutes, "
+                "puis restaure automatiquement le planning habituel. "
+                "Utilise cet outil pour : 'donne 1h en mode permissif à Meryl', "
+                "'bloque Ivy pendant 30 minutes', 'active le mode travail pour 2h'."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "profile": {"type": "string"},
+                    "mode": {
+                        "type": "string",
+                        "enum": ["permissive", "work", "blocked"],
+                        "description": "permissive=accès libre, work=contenu éducatif seulement, blocked=tout bloqué"
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 240,
+                        "description": "Durée en minutes (5–240)"
+                    }
+                },
+                "required": ["profile", "mode", "minutes"]
             }
         }
     },
@@ -433,6 +464,58 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
         labels = {"work": "travail", "permissive": "permissif", "both": "travail + permissif"}
         notify_monitor()
         return f"{domain} ajouté à la blacklist {labels.get(list_name, list_name)}."
+
+    if name == "allow_mode_for":
+        profile = args["profile"]
+        mode    = args["mode"]
+        minutes = int(args["minutes"])
+        if err := _check_profile(profile): return err
+        if mode not in ("permissive", "work", "blocked"):
+            return f"Mode invalide : {mode}"
+        if not (5 <= minutes <= _MAX_MODE_OVERRIDE_MIN):
+            return f"Durée invalide : {minutes} min (5–{_MAX_MODE_OVERRIDE_MIN})"
+        profile_cfg = config["profiles"].get(profile, {})
+        device_ips = [d["ip"] for d in profile_cfg.get("devices", [])]
+        if not device_ips:
+            return f"Aucun appareil configuré pour {profile}."
+
+        import scheduler
+        from domain_classifier import get_active_blacklist
+        from datetime import timedelta
+
+        scheduler.set_temp_override(profile, mode, minutes)
+        blacklist = get_active_blacklist(mode) if mode in ("work", "permissive") else []
+        _queue_action("apply_pihole_mode", {
+            "profile": profile, "mode": mode,
+            "device_ips": device_ips, "blacklist": blacklist
+        })
+        expires_label = (datetime.now() + timedelta(minutes=minutes)).strftime("%H:%M")
+        db.log_event(profile, "info", "",
+                     f"Override temporaire : mode {mode} pendant {minutes} min (jusqu'à {expires_label})")
+        notify_monitor()
+
+        def _restore():
+            try:
+                scheduler.clear_temp_override(profile)
+                cfg  = _load_config()
+                slot = scheduler.get_slot_at(profile, datetime.now())
+                restored_mode = slot["mode"]
+                ips  = [d["ip"] for d in cfg["profiles"].get(profile, {}).get("devices", [])]
+                bl   = get_active_blacklist(restored_mode) if restored_mode in ("work", "permissive") else []
+                _queue_action("apply_pihole_mode", {
+                    "profile": profile, "mode": restored_mode,
+                    "device_ips": ips, "blacklist": bl
+                })
+                db.log_event(profile, "info", "",
+                             f"Override temporaire terminé — retour en mode {restored_mode}")
+                notify_monitor()
+            except Exception as e:
+                print(f"[Agent] Erreur restauration override {profile} : {e}")
+
+        threading.Timer(minutes * 60, _restore).start()
+        mode_labels = {"permissive": "libre (permissif)", "work": "travail", "blocked": "bloqué"}
+        return (f"{profile} en mode {mode_labels.get(mode, mode)} pendant {minutes} minutes. "
+                f"Retour au planning automatique à {expires_label}.")
 
     if name == "query_history":
         profile = args["profile"]
