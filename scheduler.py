@@ -7,6 +7,7 @@ Le planning est lu depuis config.json (profiles[key]["schedule"]).
 """
 
 import json
+import threading
 from datetime import datetime, time, timedelta
 from paths import CONFIG_PATH
 
@@ -23,14 +24,42 @@ _slot_extensions: dict[str, tuple[int, str]] = {}
 
 # Overrides temporaires de mode — (mode, expires_at)
 _temp_overrides: dict[str, tuple[str, datetime]] = {}
+_temp_timers:    dict[str, threading.Timer]       = {}
 
 
 def set_temp_override(profile: str, mode: str, minutes: int) -> None:
+    if profile in _temp_timers:
+        _temp_timers.pop(profile).cancel()
     _temp_overrides[profile] = (mode, datetime.now() + timedelta(minutes=minutes))
 
 
+def register_temp_timer(profile: str, timer: threading.Timer) -> None:
+    if profile in _temp_timers:
+        _temp_timers.pop(profile).cancel()
+    _temp_timers[profile] = timer
+
+
 def clear_temp_override(profile: str) -> None:
+    if profile in _temp_timers:
+        _temp_timers.pop(profile).cancel()
     _temp_overrides.pop(profile, None)
+
+
+def get_all_temp_overrides() -> list[dict]:
+    """Retourne tous les overrides temporaires actifs (expire les entrées obsolètes)."""
+    now     = datetime.now()
+    expired = [p for p, (_, exp) in _temp_overrides.items() if now >= exp]
+    for p in expired:
+        clear_temp_override(p)
+    return [
+        {
+            "profile":     profile,
+            "mode":        mode,
+            "expires_at":  expires_at.isoformat(),
+            "minutes_left": max(1, int((expires_at - now).total_seconds() / 60)),
+        }
+        for profile, (mode, expires_at) in _temp_overrides.items()
+    ]
 
 
 def get_temp_override(profile: str) -> str | None:

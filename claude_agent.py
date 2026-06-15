@@ -512,7 +512,10 @@ def _execute_parent_tool(name: str, args: dict, config: dict) -> str:
             except Exception as e:
                 print(f"[Agent] Erreur restauration override {profile} : {e}")
 
-        threading.Timer(minutes * 60, _restore).start()
+        t = threading.Timer(minutes * 60, _restore)
+        t.daemon = True
+        t.start()
+        scheduler.register_temp_timer(profile, t)
         mode_labels = {"permissive": "libre (permissif)", "work": "travail", "blocked": "bloqué"}
         return (f"{profile} en mode {mode_labels.get(mode, mode)} pendant {minutes} minutes. "
                 f"Retour au planning automatique à {expires_label}.")

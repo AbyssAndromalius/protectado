@@ -301,6 +301,39 @@
   <!-- ================================================================ -->
   <div class="tab-content" id="tab-gestion" style="display:none">
 
+    <!-- Accès temporaire -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <span class="card-title">⏱ Accès temporaire</span>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Profil</label>
+          <select id="temp-profile"></select>
+        </div>
+        <div class="form-field">
+          <label>Mode</label>
+          <select id="temp-mode">
+            <option value="permissive">🟢 Libre (permissif)</option>
+            <option value="work">📚 Travail</option>
+            <option value="blocked">🔴 Bloqué</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Durée</label>
+          <select id="temp-minutes">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60" selected>1 heure</option>
+            <option value="90">1h30</option>
+            <option value="120">2 heures</option>
+          </select>
+        </div>
+        <button class="btn-primary" style="align-self:flex-end" onclick="addTempOverride()">Activer</button>
+      </div>
+      <div id="temp-overrides-list"></div>
+    </div>
+
     <!-- Overrides planning -->
     <div class="card" style="margin-bottom:24px">
       <div class="card-header">
@@ -795,7 +828,68 @@
     async function loadManagementTab() {
       const grid = document.getElementById("schedule-grid");
       if (grid) grid.innerHTML = `<p style="color:#475569;font-size:0.8rem">Chargement...</p>`;
-      await Promise.all([loadOverrides(), loadSchedule(), loadDomains()]);
+      await Promise.all([loadTempOverrides(), loadOverrides(), loadSchedule(), loadDomains()]);
+    }
+
+    // ---- Overrides temporaires ----
+
+    const _TEMP_MODE_LABELS = {
+      permissive: { icon: '🟢', label: 'Libre (permissif)', cls: 'badge-green' },
+      work:       { icon: '📚', label: 'Travail',           cls: 'badge-blue'  },
+      blocked:    { icon: '🔴', label: 'Bloqué',            cls: 'badge-red'   },
+    };
+
+    async function loadTempOverrides() {
+      try {
+        const data = await fetch("/api/temp-overrides").then(r => r.json());
+        renderTempOverrides(data);
+      } catch(_) {}
+    }
+
+    function renderTempOverrides(list) {
+      const el = document.getElementById("temp-overrides-list");
+      if (!list.length) { el.innerHTML = ''; return; }
+      el.innerHTML = `<div style="overflow-x:auto;margin-top:12px">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+          <thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid #334155">
+            <th style="padding:6px 8px">Profil</th>
+            <th style="padding:6px 8px">Mode actif</th>
+            <th style="padding:6px 8px">Expire dans</th>
+            <th style="padding:6px 8px"></th>
+          </tr></thead>
+          <tbody>${list.map(t => {
+            const m = _TEMP_MODE_LABELS[t.mode] || { icon:'', label: t.mode, cls:'badge-yellow' };
+            const mins = t.minutes_left;
+            const left = mins >= 60 ? `${Math.floor(mins/60)}h${(mins%60).toString().padStart(2,'0')}` : `${mins} min`;
+            return `<tr style="border-bottom:1px solid #0f172a">
+              <td style="padding:7px 8px;font-weight:500">${t.profile}</td>
+              <td style="padding:7px 8px"><span class="badge ${m.cls}">${m.icon} ${m.label}</span></td>
+              <td style="padding:7px 8px;color:#94a3b8">${left}</td>
+              <td style="padding:7px 8px;text-align:right">
+                <button class="btn-danger" onclick="cancelTempOverride('${t.profile}')">Annuler</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`;
+    }
+
+    async function addTempOverride() {
+      const profile = document.getElementById("temp-profile").value;
+      const mode    = document.getElementById("temp-mode").value;
+      const minutes = parseInt(document.getElementById("temp-minutes").value);
+      if (!profile) return;
+      const r = await fetch("/api/temp-overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, mode, minutes })
+      });
+      if (!r.ok) { const e = await r.json(); alert(e.error || "Erreur"); return; }
+      await loadTempOverrides();
+    }
+
+    async function cancelTempOverride(profile) {
+      await fetch(`/api/temp-overrides/${profile}`, { method: "DELETE" });
+      await loadTempOverrides();
     }
 
     // ---- Overrides ----
@@ -887,11 +981,16 @@
     }
 
     function populateProfileSelector() {
-      const sel = document.getElementById("ov-profile");
-      const current = sel.value;
-      sel.innerHTML = Object.entries(scheduleData).map(([key, s]) =>
-        `<option value="${key}"${key === current ? ' selected' : ''}>${s.name}</option>`
+      const opts = Object.entries(scheduleData).map(([key, s]) =>
+        `<option value="${key}">${s.name}</option>`
       ).join("");
+      for (const id of ["ov-profile", "temp-profile"]) {
+        const sel = document.getElementById(id);
+        if (!sel) continue;
+        const current = sel.value;
+        sel.innerHTML = opts;
+        if (current) sel.value = current;
+      }
     }
 
     // ---- Domaines ----

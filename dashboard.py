@@ -20,8 +20,10 @@ from pydantic import BaseModel, Field
 import database as db
 from monitor import ProtectadoMonitor
 from paths import CONFIG_PATH, DATA_DIR, DB_PATH as _DB_PATH
+import scheduler as _scheduler
 from scheduler import get_slot_at
 import claude_agent
+import threading as _threading
 
 app = FastAPI(title="Protectado")
 templates = Jinja2Templates(directory="templates")
@@ -466,6 +468,75 @@ async def delete_override(profile: str, date: str):
             (profile, date)
         )
     get_monitor().notify()
+    return JSONResponse({"ok": True})
+
+
+# ---- Overrides temporaires de mode ----
+
+@app.get("/api/temp-overrides")
+async def list_temp_overrides():
+    return JSONResponse(_scheduler.get_all_temp_overrides())
+
+
+class TempOverrideCreate(BaseModel):
+    profile: str
+    mode: str
+    minutes: int
+
+
+@app.post("/api/temp-overrides")
+async def create_temp_override(body: TempOverrideCreate, request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False}, status_code=401)
+    if not _PROFILE_KEY_RE.match(body.profile):
+        return JSONResponse({"ok": False, "error": "profil invalide"}, status_code=400)
+    if body.mode not in ("permissive", "work", "blocked"):
+        return JSONResponse({"ok": False, "error": "mode invalide"}, status_code=400)
+    if not (5 <= body.minutes <= 240):
+        return JSONResponse({"ok": False, "error": "durée invalide (5–240 min)"}, status_code=400)
+
+    m = get_monitor()
+    profile_cfg = m.config["profiles"].get(body.profile)
+    if not profile_cfg:
+        return JSONResponse({"ok": False, "error": "profil inconnu"}, status_code=400)
+
+    import domain_classifier as _dc
+    _scheduler.set_temp_override(body.profile, body.mode, body.minutes)
+    m._apply_pihole_mode(body.profile, body.mode)
+    db.log_event(body.profile, "info", "",
+                 f"Override temporaire (GUI) : mode {body.mode} pendant {body.minutes} min")
+    m.notify()
+
+    def _restore():
+        try:
+            _scheduler.clear_temp_override(body.profile)
+            cfg  = json.load(open(CONFIG_PATH))
+            slot = _scheduler.get_slot_at(body.profile, datetime.now())
+            m._apply_pihole_mode(body.profile, slot["mode"])
+            db.log_event(body.profile, "info", "",
+                         f"Override temporaire terminé — retour en mode {slot['mode']}")
+            m.notify()
+        except Exception as e:
+            print(f"[Dashboard] Erreur restauration override {body.profile} : {e}")
+
+    t = _threading.Timer(body.minutes * 60, _restore)
+    t.daemon = True
+    t.start()
+    _scheduler.register_temp_timer(body.profile, t)
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/temp-overrides/{profile}")
+async def cancel_temp_override(profile: str, request: Request):
+    if not _check_session(request):
+        return JSONResponse({"ok": False}, status_code=401)
+    _scheduler.clear_temp_override(profile)
+    m = get_monitor()
+    slot = _scheduler.get_slot_at(profile, datetime.now())
+    m._apply_pihole_mode(profile, slot["mode"])
+    db.log_event(profile, "info", "",
+                 f"Override temporaire annulé — retour en mode {slot['mode']}")
+    m.notify()
     return JSONResponse({"ok": True})
 
 
